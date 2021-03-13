@@ -32,6 +32,13 @@ cd ~/catkin_ws
 catkin build
 ```
 
+And make all the files in scripts directory executable
+
+```sh
+cd ~/catkin_ws/src/interiit21_drdo/scripts
+sudo chmod +x nav.py
+```
+
 Using nav.py file
 
 ```sh
