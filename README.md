@@ -2,9 +2,7 @@
 
 First follow the instructions in [Installation.md](Installation.md) file.
 
-## Set Up Catkin workspace
-
-We use `catkin build` instead of `catkin_make`. Please install the following:
+Install the following:
 
 ```sh
 sudo apt-get install python-wstool python-rosinstall-generator python-catkin-tools
@@ -19,8 +17,6 @@ catkin init
 echo "source ~/catkin_ws/devel/setup.bash" >> ~/.bashrc
 source ~/.bashrc
 ```
-
-
 
 Then clone this repo in catkin workspace
 
