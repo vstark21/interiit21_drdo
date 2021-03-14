@@ -134,3 +134,16 @@ cd ~/ardupilot/ArduCopter/
 sim_vehicle.py -v ArduCopter -f gazebo-iris --console
 ```
 
+In another Terminal (Terminal 3), run Navigation Stack:
+```sh
+rosrun interiit21_drdo nav.py 
+```
+
+Then in the MavProxy Console
+```bash
+STABILIZE> arm throttle
+STABILIZE> mode GUIDED
+```
+
+This should enable the nav.py console to control the drone manually.
+

@@ -47,8 +47,8 @@ class Controller:
     def dpcamrgb_callback(self, data):
         try:
             bridge = CvBridge()
-            image = bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')[:, :, ::-1]
-            cv2.imshow("Forward_rgb", image)
+            image1 = bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')[:, :, ::-1]
+            cv2.imshow("Forward_rgb", image1)
             cv2.waitKey(1)
         except Exception as e:
             rospy.loginfo(e)
@@ -56,8 +56,8 @@ class Controller:
     def dpcam_callback(self, data):
         try:
             bridge = CvBridge()
-            image = bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')
-            cv2.imshow("Forward_depth", image)
+            image2 = bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')
+            cv2.imshow("Forward_depth", image2)
             cv2.waitKey(1)
         except Exception as e:
             rospy.loginfo(e)
@@ -171,6 +171,10 @@ class Controller:
     
     def connect(self):
 
+        vel = Twist()
+        for i in range(100):
+            self.cmd_vel_pub.publish(vel)
+        
         while not self.state.connected:
             rospy.loginfo_once("Connecting to drone")
             rospy.sleep(0.01)
