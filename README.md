@@ -1,4 +1,4 @@
-﻿# interiit21_drdo
+﻿interiit21_drdo
 
 First follow the instructions in [Installation.md](Installation.md) file.
 
@@ -37,6 +37,13 @@ And make all the files in scripts directory executable
 ```sh
 cd ~/catkin_ws/src/interiit21_drdo/scripts
 sudo chmod +x nav.py
+```
+
+Now remove `gimbal_small_2d/` directory
+
+```sh
+cd ~/.gazebo/models
+rm -r gimbal_small_2d
 ```
 
 Using nav.py file
