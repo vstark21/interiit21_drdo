@@ -22,8 +22,10 @@ class Controller:
         rospy.init_node('control_node')
         rospy.Subscriber("/mavros/state", State, self.state_callback)
         rospy.Subscriber("/mavros/local_position/pose", PoseStamped, self.pos_callback)
-        rospy.Subscriber("/depth_camera/rgb/image_raw", Image, self.dpcamrgb_callback)
-        rospy.Subscriber("/depth_camera/depth/image_raw", Image, self.dpcam_callback)
+        # Better to comment these lines, unless you need them
+        # rospy.Subscriber("/depth_camera/rgb/image_raw", Image, self.dpcamrgb_callback)
+        # rospy.Subscriber("/depth_camera/depth/image_raw", Image, self.dpcam_callback)
+        rospy.Subscriber("/camera/color/image_raw", Image, self.downcam_callback)
 
         self.cmd_pos_pub = rospy.Publisher("/mavros/setpoint_position/local", PoseStamped, queue_size=1)
         self.cmd_vel_pub = rospy.Publisher("/mavros/setpoint_velocity/cmd_vel_unstamped", Twist, queue_size=1)
@@ -58,6 +60,15 @@ class Controller:
             bridge = CvBridge()
             image2 = bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')
             cv2.imshow("Forward_depth", image2)
+            cv2.waitKey(1)
+        except Exception as e:
+            rospy.loginfo(e)
+
+    def downcam_callback(self, data):
+        try:
+            bridge = CvBridge()
+            image3 = bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')[:, :, ::-1]
+            cv2.imshow("Downward_rgb", image3)
             cv2.waitKey(1)
         except Exception as e:
             rospy.loginfo(e)
@@ -243,10 +254,14 @@ if __name__ == "__main__":
 
     cont = Controller()
 
-    cont.connect()
-    cont.takeoff(4)
+    # Flight variables
+    takeoff_height = 5
+    velocity = 1
 
-    input_thread = threading.Thread(target=take_inputs, args=(1,cont))
+    cont.connect()
+    cont.takeoff(takeoff_height)
+
+    input_thread = threading.Thread(target=take_inputs, args=(velocity, cont))
     input_thread.start()
 
     rate = rospy.Rate(10)
