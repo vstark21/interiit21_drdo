@@ -246,7 +246,7 @@ if __name__ == "__main__":
     cont.connect()
     cont.takeoff(4)
 
-    input_thread = threading.Thread(target=take_inputs, args=(1,cont))
+    input_thread = threading.Thread(target=take_inputs, args=(0.3,cont))
     input_thread.start()
 
     rate = rospy.Rate(10)
