@@ -57,6 +57,17 @@ launching rtabmap
 ```sh
 roslaunch interiit21_drdo slam.launch
 ```
-roslaunch rtabmap_ros rtabmap.launch     rtabmap_args:="--delete_db_on_start"    frame_id:=camera_link_optical rgb_topic:=/depth_camera/rgb/image_raw     depth_topic:=/depth_camera/depth/image_raw     camera_info_topic:=/depth_camera/depth/camera_info  rviz:=true
+
+## Topics
+
+Octomap output
+```bash
+/rtabmap/octomap_full		## contains octomap with color
+/rtabmap/octomap_binary		## contains octomap with only binary value
 ```
 
+Odometry
+```bash
+/mavros/local_position/odom	## Accurate but is slow at 5 Hz
+/rtabmap/odom			## Faster method to achive odometry
+```
