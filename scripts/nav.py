@@ -256,7 +256,7 @@ if __name__ == "__main__":
 
     # Flight variables
     takeoff_height = 5
-    velocity = 0.3
+    velocity = 0.6
 
     cont.connect()
     cont.takeoff(takeoff_height)
