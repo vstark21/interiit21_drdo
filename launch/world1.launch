@@ -1,4 +1,0 @@
-<launch>
-	<include file="$(find interiit21)/launch/interiit_world1.launch"/>
-	<include file="$(find interiit21_drdo)/launch/slam.launch"/>
-</launch>
