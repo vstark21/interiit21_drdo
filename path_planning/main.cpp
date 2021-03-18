@@ -1,10 +1,13 @@
 // #include <iostream>
-
+    #include<windows.h>
+#include <octomap_msgs/Octomap.h>
+#include "conversion.h" //conversion.h has to be placed
 #include <octomap/AbstractOcTree.h>
 #include <octomap/OcTree.h>
 #include <octomap/OccupancyOcTreeBase.h>
 #include <octomap/octomap.h>
 #include <bits/stdc++.h>
+#include <unistd.h>
 
 
 using namespace std;
@@ -251,14 +254,20 @@ void Astar(point3d current, point3d dest, vector<point>& mp, OcTree* octree){
 }
 
 int main() {
-	AbstractOcTree* tree = AbstractOcTree::read("/home/vishwas/Downloads/octomap.ot");
-    cout << "Tree size : " << tree->size() << endl;
-	// OcTree* octree = dynamic_cast<OcTree*>(tree);
-    OcTree* octree = (OcTree*)tree;
+while(1){
+    octomap_msgs/Octomap msg;
+    //AbstractOcTree* tree= msgToMap( msg);
+    AbstractOcTree* tree= fullMsgToMap( msg);
+
+
+	// AbstractOcTree* tree = AbstractOcTree::read("/home/vishwas/Downloads/octomap.ot");
+    // cout << "Tree size : " << tree->size() << endl;
+	// // OcTree* octree = dynamic_cast<OcTree*>(tree);
+     OcTree* octree = (OcTree*)tree;
 
 
     point3d current(10.0, 1.0, 0.0);
-    point3d bbx_size(20.0, 1.0, 20.0);
+    point3d bbx_size(5.0, 1.5, 5.0);
     point3d dest(0.0, 1.0, 7.0);
 
     vector<pair<point3d, double>> box_vector;
@@ -289,6 +298,8 @@ int main() {
 
     Astar(current, dest, mp, octree);
 
+Sleep(1000);
+}
 	return 0;
 }
 
