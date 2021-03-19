@@ -184,15 +184,15 @@ point Astar(point3d current, point3d dest, vector<point>& mp, OcTree* octree){
         return target;
     }
 
-    point3d f11(start.first.first, start.first.second, start.second);
-    point3d f22(target.first.first, target.first.second, target.second);
+    // point3d f11(start.first.first, start.first.second, start.second);
+    // point3d f22(target.first.first, target.first.second, target.second);
 
-    bool ret = raycast(f11, f22, octree);
+    // bool ret = raycast(f11, f22, octree);
 
-    if(!ret){
-       cout << "ERROR!\n";
+    // if(!ret){
+    //    cout << "ERROR!\n";
 
-    }
+    // }
 
 
     for(int i=0;i<mp.size()-1;i+=1){
@@ -280,7 +280,7 @@ point Astar(point3d current, point3d dest, vector<point>& mp, OcTree* octree){
             if(g[q.second] + norm_elqs < g[el]){
                 parent[el] = q.second;
                 g[el] = g[q.second] + norm_elqs;
-                h[el] = l2_norm(target, mp[el]);
+                h[el] = l2_norm(target, mp[el]) + pow(mp[el].first.second - 3.0, 2);
                 f[el] = g[el] + h[el];
                 openpq.push({f[el], el});
             }
@@ -303,10 +303,10 @@ point Astar(point3d current, point3d dest, vector<point>& mp, OcTree* octree){
     return start;
 }
 
-point3d calc_dest(point3d current){
-    point3d dest(current.x()+5.0, current.y(), current.z());
-    return dest;
-}
+// point3d calc_dest(point3d current){
+//     point3d dest(current.x()+5.0, current.y(), current.z());
+//     return dest;
+// }
 
 // int main() {
 

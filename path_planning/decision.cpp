@@ -28,17 +28,31 @@ bool check_occupancy(point3d g, OcTree* octree){
 point3d decide(point3d current, point3d prev, point3d orien, OcTree* octree){
 
     double length = 3.0;
+    point3d pull;
+    if(current.y() <= 3.0){
+        point3d pull_(0.0, 0.1*pow(3.0 - current.y(), 2), 0.0);
+        pull = pull_;
+    }
+    else{
+        point3d pull_(0.0, -0.1 * pow(3.0 - current.y(), 2), 0.0);
+        pull = pull_;
+    }
 
-    point3d orien_norm = orien.normalize();
-    point3d prev_norm = (prev - current).normalize();
+    point3d f1(orien.x(), 0.0, orien.z());
+    point3d f2(prev.x() - current.x(), 0.0, prev.z() - current.z());
+
+    
+    point3d orien_norm = f1.normalize();
+
+    point3d prev_norm = f2.normalize();
     
     // if(prev_norm.y() + orien_norm.y() )
-    point3d new_dir = prev_norm + orien_norm;
+    point3d new_dir = prev_norm + orien_norm + pull;
     point3d new_dir_norm = new_dir.normalize();
 
     new_dir = prec(new_dir_norm * length);
 
-    while(check_occupancy(new_dir, octree)){
+    while(check_occupancy(new_dir + current, octree)){
         length += 0.5;
         new_dir = prec(new_dir_norm * length);
     }
@@ -72,7 +86,7 @@ int main(){
         point3d dest = decide(current, prev, orien, octree);
         cout << "DEST : ";
         print3d(dest);
-        print3d(bbx_size);
+        // print3d(bbx_size);
         prev = dest;
 
         vector<pair<point3d, double>> box_vector;
