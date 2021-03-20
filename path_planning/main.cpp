@@ -1,5 +1,9 @@
 // #include <iostream>
-
+// #include<windows.h>
+// #include <time.h>
+#include <unistd.h>
+// #include <octomap_msgs/Octomap.h>
+// #include "conversions.h" 
 #include <octomap/AbstractOcTree.h>
 #include <octomap/OcTree.h>
 #include <octomap/OccupancyOcTreeBase.h>
@@ -32,16 +36,16 @@ void getBoxesBoundingBox(
     || octree_->size() == 0) {
     return;
   }
-  const point3d max_boxes(2 * bounding_box_size.x() / octree_->getResolution(),
-                            2 * bounding_box_size.y() / octree_->getResolution(),
-                            2 * bounding_box_size.z() / octree_->getResolution());
-  const int max_vector_size = ceil(max_boxes.x()) *
+  point3d max_boxes(2.0 * bounding_box_size.x() / octree_->getResolution(),
+                            2.0 * bounding_box_size.y() / octree_->getResolution(),
+                            2.0 * bounding_box_size.z() / octree_->getResolution());
+  long int max_vector_size = ceil(max_boxes.x()) *
                               ceil(max_boxes.y()) *
                               ceil(max_boxes.z());
   box_vector->reserve(max_vector_size);
 
   const double epsilon = 0.001;  // Small offset to not hit boundary of nodes.
-  point3d epsilon_3d;
+  point3d epsilon_3d(epsilon, epsilon, epsilon);
 //   epsilon_3d.setConstant(epsilon);
 
   point3d bbx_min = position - bounding_box_size + epsilon_3d;
@@ -85,7 +89,7 @@ void find_corners(point3d p, double d, map<point, int>& m){
     //         }
     //     }
     // }
-    double factor=1.0;
+    double factor=2.0;
     int cx, cy, cz;
     double fx, fy, fz;
     for(int i=-1; i<=1; i+=1){
@@ -93,11 +97,11 @@ void find_corners(point3d p, double d, map<point, int>& m){
             for(int k=-1;k<=1;k+=1){
                 if(i==0 && j==0 && k==0)continue;
                 cx = (p.x() + i*(d+dronex)/2)*factor;
-                fx = cx * factor;
+                fx = cx / factor;
                 cy = (p.y() + j*(d+droney)/2)*factor;
-                fy = cy * factor;
+                fy = cy / factor;
                 cz = (p.z() + k*(d+dronez)/2)*factor;
-                fz = cz * factor;
+                fz = cz / factor;
                 
                 insert({{fx, fy}, fz}, m);
             }
@@ -110,7 +114,22 @@ void print3d(point3d f3){
     cout << f3.x() << " " << f3.y() << " " << f3.z() << "\n";
 }
 
+bool raycast(point3d src, point3d dest, OcTree* octree){
+    if(src.y() < 0.3)return true;
+    if(dest.y() < 0.3)return true;
+    if(src.y() > 4.7)return true;
+    if(dest.y() > 4.7)return true;
+
+    point3d f3;
+    OccupancyOcTreeBase<OcTreeNode>* octree_ = (OccupancyOcTreeBase<OcTreeNode>*) octree;
+    bool ret = octree_->castRay(src, dest-src, f3, true);
+    // cout << "f3 : ";
+    // print3d(f3);
+    return ret;
+}
+
 double l2_norm(point a, point b){
+    // No need of sqrt
     return sqrt(pow(a.first.first - b.first.first, 2) + 
                     pow(a.first.second - b.first.second, 2) +
                     pow(a.second - b.second, 2));
@@ -121,9 +140,17 @@ point generate_path(int qidx,
                     int start_idx, 
                     int target_idx, 
                     vector<point>& mp, 
-                    int parent[]){
+                    int parent[],
+                    int numVertices){
     int current = target_idx;
     point x = mp[target_idx];
+
+    
+    // for(int i=0;i<numVertices;i+=1){
+    //     cout << parent[i] << " ";
+    // }
+
+    cout << "PATH STARTED : \n";
     
     while(current != start_idx){
         current = parent[current];
@@ -132,13 +159,15 @@ point generate_path(int qidx,
         }
         cout << mp[current].first.first << " " << mp[current].first.second << " " << mp[current].second << "\n";
     }
+
+    cout << ": PATH ENDED\n";
     return x;
 
 }
 
-void Astar(point3d current, point3d dest, vector<point>& mp, OcTree* octree){
+point Astar(point3d current, point3d dest, vector<point>& mp, OcTree* octree){
 
-    OccupancyOcTreeBase<OcTreeNode>* octree_ = (OccupancyOcTreeBase<OcTreeNode>*) octree;
+    // OccupancyOcTreeBase<OcTreeNode>* octree_ = (OccupancyOcTreeBase<OcTreeNode>*) octree;
 
     point start{{current.x(), current.y()}, current.z()}, target({{dest.x(), dest.y()}, dest.z()});
 
@@ -150,6 +179,20 @@ void Astar(point3d current, point3d dest, vector<point>& mp, OcTree* octree){
     int numVertices = mp.size();
     vector<int> adj[numVertices];
     
+    if(!raycast(current, dest, octree)){
+        cout << "DIRECT PATH FOUND!\n";
+        return target;
+    }
+
+    // point3d f11(start.first.first, start.first.second, start.second);
+    // point3d f22(target.first.first, target.first.second, target.second);
+
+    // bool ret = raycast(f11, f22, octree);
+
+    // if(!ret){
+    //    cout << "ERROR!\n";
+
+    // }
 
 
     for(int i=0;i<mp.size()-1;i+=1){
@@ -157,14 +200,16 @@ void Astar(point3d current, point3d dest, vector<point>& mp, OcTree* octree){
 
             point3d f1(mp[i].first.first, mp[i].first.second, mp[i].second);
             point3d f2(mp[j].first.first, mp[j].first.second, mp[j].second);
-            point3d f3;
 
-            bool ret = octree_->castRay(f1, f2-f1, f3, true);
-            if(ret)countTrue += 1;
+            bool ret = raycast(f1, f2, octree);
+            if(ret){
+                countTrue += 1;
+            }
             else {
                 numEdges+=1;
                 adj[i].push_back(j);
-                adj[j].push_back(i);}
+                adj[j].push_back(i);
+            }
 
             // print3d(f1);
             // print3d(f2);
@@ -173,9 +218,12 @@ void Astar(point3d current, point3d dest, vector<point>& mp, OcTree* octree){
             // cout << ret << endl;
         }
     }
+    // for(auto i:adj[numVertices - 1]){
+    //     cout << i << " ";
+    // }
 
     cout << "Size of mp : " << mp.size() << endl;
-    cout << "CountTrue : " << countTrue << endl;
+    cout << "numEdges : " << numEdges << endl;
 
     double g[numVertices];
     double h[numVertices];
@@ -183,16 +231,18 @@ void Astar(point3d current, point3d dest, vector<point>& mp, OcTree* octree){
 
     for(int i=0;i<numVertices;i+=1){
         // h[i] = l2_norm(target, mp[i]);
-        g[i] = 10000000;
+        g[i] = 10000000.0;
     }
     
     int start_idx = numVertices - 2;
     int target_idx = numVertices - 1;
 
-    g[start_idx] = 0;
+    g[start_idx] = 0.0;
+    h[start_idx] = 10000000.0;
     f[start_idx] = g[start_idx] + h[start_idx];
+    
 
-    priority_queue<pair<int, int>, vector<pair<int, int>>, greater<pair<int, int>>> openpq;
+    priority_queue<pair<double, int>, vector<pair<double, int>>, greater<pair<double, int>>> openpq;
     // map<int, int> openmp;
     // map<int, int> closemp;
     // map<int, int> parent;
@@ -202,20 +252,21 @@ void Astar(point3d current, point3d dest, vector<point>& mp, OcTree* octree){
 
     memset(openarray, -1, sizeof(openarray));
     memset(closearray, -1, sizeof(closearray));
+    memset(parent, -1, sizeof(parent));
 
 
     openpq.push({f[start_idx], start_idx});
     openarray[start_idx] = f[start_idx];
 
     while(!openpq.empty()){
-        pair<int,int> q = openpq.top();
+        pair<double,int> q = openpq.top();
         openpq.pop();
         
         if(closearray[q.second] != -1)continue;
 
         if(q.second == target_idx){
-            point x = generate_path(q.second, start_idx, target_idx, mp, parent);
-            break;
+            point x1 = generate_path(q.second, start_idx, target_idx, mp, parent, numVertices);
+            return x1;
         }
 
         closearray[q.second] = f[q.second];
@@ -229,7 +280,7 @@ void Astar(point3d current, point3d dest, vector<point>& mp, OcTree* octree){
             if(g[q.second] + norm_elqs < g[el]){
                 parent[el] = q.second;
                 g[el] = g[q.second] + norm_elqs;
-                h[el] = l2_norm(target, mp[el]);
+                h[el] = l2_norm(target, mp[el]) + pow(mp[el].first.second - 3.0, 2);
                 f[el] = g[el] + h[el];
                 openpq.push({f[el], el});
             }
@@ -248,49 +299,66 @@ void Astar(point3d current, point3d dest, vector<point>& mp, OcTree* octree){
         }
         // closearray[q.second] = f[q.second];
     }
+    cout << "NO PATH FOUND\n";
+    return start;
 }
 
-int main() {
-	AbstractOcTree* tree = AbstractOcTree::read("/home/hexplex0xdd/octomap.ot");
-    cout << "Tree size : " << tree->size() << endl;
-	// OcTree* octree = dynamic_cast<OcTree*>(tree);
-    OcTree* octree = (OcTree*)tree;
+// point3d calc_dest(point3d current){
+//     point3d dest(current.x()+5.0, current.y(), current.z());
+//     return dest;
+// }
+
+// int main() {
+
+//     while(1){
+        
+//         octomap_msgs/Octomap msg;
+//         //AbstractOcTree* tree= msgToMap( msg);
+//         AbstractOcTree* tree= fullMsgToMap( msg);
 
 
-    point3d current(10.0, 1.0, 0.0);
-    point3d bbx_size(20.0, 1.0, 20.0);
-    point3d dest(0.0, 1.0, 7.0);
-
-    vector<pair<point3d, double>> box_vector;
-
-    getBoxesBoundingBox(current, bbx_size, &box_vector, octree);
-
-    cout << "Size of box_vector : " << box_vector.size() << endl;
-
-    map<point, int> m;
-    for(int i=0;i<box_vector.size();i++){
-        find_corners(box_vector[i].first, box_vector[i].second, m);
-    } 
-    cout << "Size of map : " << m.size() << endl;
-
-    int count = 0;
-    for(auto i:m){
-        if(i.second == 1)count +=1;
-    } 
-    cout << "Count : " << count << endl;
-
-    vector<point> mp;
-    for(auto i:m){
-        // if(i.second == 1)
-        mp.push_back(i.first);
-    }
+//         // AbstractOcTree* tree = AbstractOcTree::read("/home/vishwas/Downloads/octomap.ot");
+//         // cout << "Tree size : " << tree->size() << endl;
+//         // // OcTree* octree = dynamic_cast<OcTree*>(tree);
+//         OcTree* octree = (OcTree*)tree;
 
 
+//         point3d current(10.0, 1.0, 0.0);
+//         point3d bbx_size(5.0, 1.5, 5.0);
+//         point3d dest = calc_dest(current);
 
-    Astar(current, dest, mp, octree);
+//         vector<pair<point3d, double>> box_vector;
 
-	return 0;
-}
+//         getBoxesBoundingBox(current, bbx_size, &box_vector, octree);
+
+//         cout << "Size of box_vector : " << box_vector.size() << endl;
+
+//         map<point, int> m;
+//         for(int i=0;i<box_vector.size();i++){
+//             find_corners(box_vector[i].first, box_vector[i].second, m);
+//         } 
+//         cout << "Size of map : " << m.size() << endl;
+
+//         int count = 0;
+//         for(auto i:m){
+//             if(i.second == 1)count +=1;
+//         } 
+//         cout << "Count : " << count << endl;
+
+//         vector<point> mp;
+//         for(auto i:m){
+//             // if(i.second == 1)
+//             mp.push_back(i.first);
+//         }
+
+
+
+//         Astar(current, dest, mp, octree);
+
+//         usleep(1000);
+//     }
+// 	return 0;
+// }
 
     // OccupancyOcTreeBase<OcTreeNode>* octree_ = (OccupancyOcTreeBase<OcTreeNode>*) octree;
 
