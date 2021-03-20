@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.0.2)
 project(interiit21_drdo)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
-# add_compile_options(-std=c++11)
+add_compile_options(-std=c++11)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -14,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   message_generation
   geometry_msgs
+  octomap_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -137,8 +138,8 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-# add_executable(${PROJECT_NAME}_node src/interiit21_drdo_node.cpp)
-
+add_executable(path_planning src/planning.cpp)
+target_link_libraries(path_planning  ${catkin_LIBRARIES} octomap)
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
 ## target back to the shorter version for ease of user use

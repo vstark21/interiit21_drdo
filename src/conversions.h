@@ -39,6 +39,7 @@
 #define OCTOMAP_MSGS_CONVERT_MSGS_H
 
 #include <octomap/octomap.h>
+#include <octomap/AbstractOcTree.h>
 #include <octomap_msgs/Octomap.h>
 #include <octomap/ColorOcTree.h>
 

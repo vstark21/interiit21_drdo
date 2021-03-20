@@ -9,12 +9,10 @@
 #include <octomap/OccupancyOcTreeBase.h>
 #include <octomap/octomap.h>
 #include <bits/stdc++.h>
-
+#include <ros/console.h>
 
 using namespace std;
 using namespace octomap;
-
-#define point pair<pair<double, double>, double>
 
 point3d bbx_size(10.0, 2.0, 10.0);
 
@@ -22,7 +20,7 @@ point3d bbx_size(10.0, 2.0, 10.0);
 void getBoxesBoundingBox(
     const point3d& position,
     const point3d& bounding_box_size,
-    vector<pair<point3d, double>>* box_vector,
+    vector<pair<point3d, double> >* box_vector,
     OcTree* octree_) {
   box_vector->clear();
   if (bounding_box_size.x() <= 0.0 || 
@@ -70,11 +68,11 @@ void getBoxesBoundingBox(
   }
 }
 
-void insert(point p, map<point, int>& m){
+void insert(pair< pair<double, double> , double> p, map< pair< pair<double, double> , double> , int>& m){
     m[p]++;
 }
 
-void find_corners(point3d p, double d, map<point, int>& m){
+void find_corners(point3d p, double d, map< pair< pair<double, double> , double>, int>& m){
     // d*=0.9;
     double dronex = 0.47, droney = 0.23, dronez = 0.47;
     // for(int i=-1; i<=1; i+=2){
@@ -106,7 +104,7 @@ void find_corners(point3d p, double d, map<point, int>& m){
 }
 
 void print3d(point3d f3){
-    cout << f3.x() << " " << f3.y() << " " << f3.z() << "\n";
+    ROS_INFO("%f %f %f",f3.x(), f3.y(), f3.z());
 }
 
 bool raycast(point3d src, point3d dest, OcTree* octree){
@@ -131,7 +129,7 @@ bool raycast(point3d src, point3d dest, OcTree* octree){
     return ret;
 }
 
-double l2_norm(point a, point b){
+double l2_norm(pair< pair<double, double> , double> a, pair< pair<double, double> , double> b){
     // No need of sqrt
     return sqrt(pow(a.first.first - b.first.first, 2) + 
                     pow(a.first.second - b.first.second, 2) +
@@ -139,21 +137,21 @@ double l2_norm(point a, point b){
 }
 
 
-point generate_path(int qidx, 
+pair< pair<double, double> , double> generate_path(int qidx, 
                     int start_idx, 
                     int target_idx, 
-                    vector<point>& mp, 
+                    vector< pair< pair<double, double> , double> >& mp, 
                     int parent[],
                     int numVertices){
     int current = target_idx;
-    point x = mp[target_idx];
+    pair< pair<double, double> , double> x = mp[target_idx];
 
     
     // for(int i=0;i<numVertices;i+=1){
     //     cout << parent[i] << " ";
     // }
 
-    cout << "PATH STARTED : \n";
+    ROS_INFO("PATH STARTED :");
     
     while(current != start_idx){
         current = parent[current];
@@ -237,11 +235,11 @@ point3d decide(point3d current, point3d prev, point3d orien, OcTree* octree){
     return ans;
 }
 
-point Astar(point3d current, point3d dest, vector<point>& mp, OcTree* octree){
+pair< pair<double, double> , double> Astar(point3d current, point3d dest, vector<pair< pair<double, double> , double> >& mp, OcTree* octree){
 
     // OccupancyOcTreeBase<OcTreeNode>* octree_ = (OccupancyOcTreeBase<OcTreeNode>*) octree;
 
-    point start{{current.x(), current.y()}, current.z()}, target({{dest.x(), dest.y()}, dest.z()});
+    pair< pair<double, double> , double> start{{current.x(), current.y()}, current.z()}, target({{dest.x(), dest.y()}, dest.z()});
 
     mp.push_back(start);
     mp.push_back(target);
@@ -295,7 +293,7 @@ point Astar(point3d current, point3d dest, vector<point>& mp, OcTree* octree){
     // }
 
     cout << "Size of mp : " << mp.size() << endl;
-    cout << "numEdges : " << numEdges << endl;
+    ROS_INFO("numEdges : %d",numEdges);
 
     double g[numVertices];
     double h[numVertices];
@@ -335,7 +333,7 @@ point Astar(point3d current, point3d dest, vector<point>& mp, OcTree* octree){
         if(closearray[q.second] != -1)continue;
 
         if(q.second == target_idx){
-            point x1 = generate_path(q.second, start_idx, target_idx, mp, parent, numVertices);
+            pair< pair<double, double> , double> x1 = generate_path(q.second, start_idx, target_idx, mp, parent, numVertices);
             return x1;
         }
 
@@ -357,7 +355,7 @@ point Astar(point3d current, point3d dest, vector<point>& mp, OcTree* octree){
                        
         }
     }
-    cout << "NO PATH FOUND\n";
+    ROS_ERROR("NO PATH FOUND");
     return start;
 }
 
