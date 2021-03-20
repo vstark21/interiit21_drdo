@@ -17,6 +17,8 @@ import math
 import numpy as np
 from cv2 import aruco
 import time
+from interiit21_drdo.msg import Setpoints
+
 
 pi_2 = math.pi / 2.0
 global KILL_THREAD
@@ -29,21 +31,20 @@ p=None
 y=None
 class Controller:
 
-    def __init__(self):
-        rospy.init_node('control_node')
+    def __init__(self,aruco=None):
+        rospy.init_node('camera_node')
         rospy.Subscriber("/mavros/state", State, self.state_callback)
         rospy.Subscriber("/mavros/local_position/pose", PoseStamped, self.pos_callback)
         # Better to comment these lines, unless you need them
         # rospy.Subscriber("/depth_camera/rgb/image_raw", Image, self.dpcamrgb_callback)
         # rospy.Subscriber("/depth_camera/depth/image_raw", Image, self.dpcam_callback)
+
         rospy.Subscriber("/camera/color/image_raw", Image, self.downcam_callback)
         self.cmd_pos_pub = rospy.Publisher("/mavros/setpoint_position/local", PoseStamped, queue_size=1)
         self.cmd_vel_pub = rospy.Publisher("/mavros/setpoint_velocity/cmd_vel_unstamped", Twist, queue_size=1)
 
-        self.mode_service = rospy.ServiceProxy("/mavros/set_mode", SetMode)
-        self.arm_service = rospy.ServiceProxy('/mavros/cmd/arming', CommandBool)
-        self.takeoff_service = rospy.ServiceProxy('/mavros/cmd/takeoff', CommandTOL)
-
+       
+        self.aruco = aruco
         self.pose = Pose()
         self.state = State()
         self.timestamp = rospy.Time()
@@ -95,138 +96,13 @@ class Controller:
             
             
             self.down_cam=image3
-            
-           
+            if self.aruco is not None:
+                global y,pos
+                print(self.aruco.Main(self.down_cam,[ self.pose.position.x, self.pose.position.y, self.pose.position.z],y))
             cv2.imshow("Downward_rgb", image3)
             cv2.waitKey(1)
         except Exception as e:
             rospy.loginfo(e)
-
-    
-    def goto(self, pose):
-        pose_stamped = PoseStamped()
-        pose_stamped.header.stamp = self.timestamp
-        pose_stamped.pose = pose
-
-        self.cmd_pos_pub.publish(pose_stamped)
-
-    def goto_xyz_rpy(self, x, y, z, ro, pi, ya):
-        pose = Pose()
-        pose.position.x = x
-        pose.position.y = y
-        pose.position.z = z
-
-        quats = tf.transformations.quaternion_from_euler(ro, pi, ya + pi_2)
-
-        pose.orientation.x = quats[0]
-        pose.orientation.y = quats[1]
-        pose.orientation.z = quats[2]
-        pose.orientation.w = quats[3]
-        self.goto(pose)
-
-    def set_vel(self, vx, vy, vz, avx=0, avy=0, avz=0):
-
-        vel = Twist()
-
-        vel.linear.x = vx
-        vel.linear.y = vy
-        vel.linear.z = vz
-
-        vel.angular.x = avx
-        vel.angular.y = avy
-        vel.angular.z = avz
-
-        self.cmd_vel_pub.publish(vel)
-
-    def moveF(self, vel):
-        quats = [self.pose.orientation.w,
-                self.pose.orientation.x,
-                self.pose.orientation.y,
-                self.pose.orientation.z]
-        theta, _, _ = tf.transformations.euler_from_quaternion(quats)
-        vx = -vel * math.cos(theta)
-        vy = vel * math.sin(theta)
-        self.set_vel(vx, vy, 0)
-
-    def moveB(self, vel):
-        quats = [self.pose.orientation.w,
-                self.pose.orientation.x,
-                self.pose.orientation.y,
-                self.pose.orientation.z]
-        theta, _, _ = tf.transformations.euler_from_quaternion(quats)
-        vx = vel * math.cos(theta)
-        vy = -vel * math.sin(theta)
-        self.set_vel(vx, vy, 0)
-
-    def moveL(self, vel):
-        quats = [self.pose.orientation.w,
-                self.pose.orientation.x,
-                self.pose.orientation.y,
-                self.pose.orientation.z]
-        theta, _, _ = tf.transformations.euler_from_quaternion(quats)
-        vx = -vel * math.sin(theta)
-        vy = -vel * math.cos(theta)
-        self.set_vel(vx, vy, 0)
-
-    def moveR(self, vel):
-        quats = [self.pose.orientation.w,
-                self.pose.orientation.x,
-                self.pose.orientation.y,
-                self.pose.orientation.z]
-        theta, _, _ = tf.transformations.euler_from_quaternion(quats)
-        vx = vel * math.sin(theta)
-        vy = vel * math.cos(theta)
-        self.set_vel(vx, vy, 0)
-
-    # Counter clockwise
-    def rotateCC(self, vel):
-        self.set_vel(0, 0, 0, avz=vel)
-
-    # Clockwise
-    def rotateC(self, vel):
-        self.set_vel(0, 0, 0, avz=-vel)
-
-    def stop(self):
-        self.set_vel(0, 0, 0)
-
-    def arm(self):
-
-        return self.arm_service(True)
-        
-    def disarm(self):
-
-        return self.arm_service(False)
-
-    def takeoff(self, height):
-
-        mode_resp = self.mode_service(custom_mode="4")
-        self.arm()
-
-        takeoff_resp = self.takeoff_service(altitude=height)
-        return takeoff_resp
-    
-    def land(self):
-
-        land_resp = self.mode_service(custom_mode="9")
-        self.disarm()
-    
-    def connect(self):
-
-        vel = Twist()
-        for i in range(100):
-            self.cmd_vel_pub.publish(vel)
-        
-        while not self.state.connected:
-            rospy.loginfo_once("Connecting to drone")
-            rospy.sleep(0.01)
-        
-        rospy.loginfo("Connected to Drone")
-
-        while self.state.mode != "GUIDED":
-            rospy.loginfo_once("Waiting for mode to set to `GUIDED`")
-            rospy.sleep(0.01)
-        
-        rospy.loginfo("Mode set to `GUIDED`")
 
 class Aruco_land():
     def __init__(self):
@@ -239,7 +115,7 @@ class Aruco_land():
         
         self.Visited = []
         self.aruco_dict = aruco.Dictionary_get(aruco.DICT_5X5_1000)
-
+        self.set_control = rospy.Publisher("/setpoint_array",Setpoints,queue_size=1)
 
 
     def Aruco(self,img):
@@ -334,89 +210,43 @@ class Aruco_land():
         if len(Unvisited):
             Unvisited = sorted(Unvisited)
             cx, cy = Unvisited[0][1]
+            ## Wrong coordnates
+        
+            temp = Setpoints()
+            a = Pose()
+            a.position.x = cx
+            a.position.y = cy
+            a.position.z = pos[-1]
+            temp.setpoints = [a]
+            temp.header.stamp = rospy.Time.now()
+        
+            #self.set_control.publish(temp)
             return (cx, cy, pos[2]), False
         
+        
+        
+
         return self.No_Point()
         
-def take_inputs(velocity, controller,aruco):
-    msg = """
-        Reading from the keyboard  and Publishing to Drone!
-        ---------------------------
-        Moving around:
-                 w
-        z    a       d   x
-                 s
-        
-        w : Move Forward
-        s : Move Backward
-        a : Move Left
-        d : Move Right
-        z : rotate counter-clockwise
-        x : rotate clockwise
-        space : STOP
-        CTRL-C to quit
-        """
-    print msg
-    settings = termios.tcgetattr(sys.stdin)
-
-    def getKey(key_timeout):
-        tty.setraw(sys.stdin.fileno())
-        rlist, _, _ = select.select([sys.stdin], [], [], key_timeout)
-        if rlist:
-            key = sys.stdin.read(1)
-        else:
-            key = ''
-        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
-        return key
-
-    while not rospy.is_shutdown() and not KILL_THREAD:
-        x = getKey(0.1)
-        if x == "w" or x == "W":
-            controller.moveF(velocity)
-        elif x == "s" or x == "S":
-            controller.moveB(velocity)
-        elif x == "a" or x == "A":
-            controller.moveL(velocity)
-        elif x == "d" or x == "D":
-            controller.moveR(velocity)
-        elif x == "z" or x == "Z":
-            controller.rotateCC(velocity)
-        elif x == "x" or x == "X":
-            controller.rotateC(velocity)
-        elif x == " ":
-            controller.stop()
-        elif x == '\x03':
-            break
-
-        # cv2.imshow("img",controller.down_cam)
-        # if cv2.waitKey(1) & 0xFF==ord('q'):
-        #     break
-        
-       
-       
-        
-        data=aruco.Main(controller.down_cam,pos,y)
-        print(data)
-        # controller.goto_xyz_rpy( 0, 0, 1, 0, 0, 0)
 
 
 if __name__ == "__main__":
-
+    #ar=Aruco_land()
     cont = Controller()
     while(pos==None):
         continue
 
     ar=Aruco_land()
-
+    cont.aruco = ar
     # Flight variables
     takeoff_height = 3
     velocity = 0.6
 
-    cont.connect()
-    cont.takeoff(takeoff_height)
+    #cont.connect()
+    #cont.takeoff(takeoff_height)
 
-    input_thread = threading.Thread(target=take_inputs, args=(velocity, cont,ar))
-    input_thread.start()
+    #input_thread = threading.Thread(target=take_inputs, args=(velocity, cont,ar))
+    #input_thread.start()
 
     rate = rospy.Rate(10)
 
@@ -427,6 +257,6 @@ if __name__ == "__main__":
         rospy.loginfo("Manual Interruption Occured")
         KILL_THREAD = True
         cv2.destroyAllWindows()
-        input_thread.join()
+        #input_thread.join()
 
     cv2.destroyAllWindows()
