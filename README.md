@@ -62,6 +62,15 @@ roslaunch interiit21_drdo slam.launch
 roslaunch rtabmap_ros rtabmap.launch     rtabmap_args:="--delete_db_on_start"    frame_id:=camera_link_optical rgb_topic:=/depth_camera/rgb/image_raw     depth_topic:=/depth_camera/depth/image_raw     camera_info_topic:=/depth_camera/depth/camera_info  rviz:=true
 ```
 
+controlling using setpoint
+```bash
+rosrun interiit21_drdo nav.py
+
+## along side with this in another terminal
+
+rosrun interiit21_drdo aruco.py
+```
+
 ## Topics
 
 Octomap output

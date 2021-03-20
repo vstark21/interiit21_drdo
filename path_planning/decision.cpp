@@ -1,5 +1,7 @@
 #include "main.cpp"
-
+#include "ros/ros.h"
+#include "geometry_msgs/Pose.h"
+#include "interiit21_drdo/Setpoints.h"
 point3d bbx_size(10.0, 2.0, 10.0);
 
 point3d prec(point3d node){
@@ -73,7 +75,10 @@ point3d decide(point3d current, point3d prev, point3d orien, OcTree* octree){
 
 
 
-int main(){
+int main(int argc, char **argv){
+    ros::init(argc, argv, "planner_node");
+    ros::NodeHandle nh;
+    ros::Publisher setpoint_control = nh.advertise<interiit21_drdo::String>("/setpoint_array", 1000);
     AbstractOcTree* tree = AbstractOcTree::read("/home/vishwas/Downloads/octomap.ot");
     OcTree* octree = (OcTree*)tree;
 
@@ -81,7 +86,8 @@ int main(){
     
     point3d prev = current;
     point3d orien(-10.0, 0.0, 7.0);
-
+    temp = interiit21_drdo::Setpoints();
+    temp.setpoints = vector<geomtry_msgs::Pose>;
     for(int check=0;check<10;check++){
         point3d dest = decide(current, prev, orien, octree);
         cout << "DEST : ";
@@ -124,8 +130,15 @@ int main(){
         cout << "CURRENT : ";
         print3d(new_x);
         print3d(orien);
+        
+        p = geometry_msgs::Pose();
+        p.position.x = x.first.first;
+        p.position.y = x.first.second;
+        p.position.z = x.second;
+        temp.setpoints.pusb_back(p);
         current = new_x;
     }
-
+    temp.header.stamp = ros::Time::now();
+    setpoint_control.publish(temp);
     return 0;
 }
