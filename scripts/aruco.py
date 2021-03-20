@@ -163,14 +163,32 @@ class Aruco_land():
         del_y = 240 - centre[1]
     
         Length = self.Distance(centre, (320, 240))
-        img_angle = math.acos(del_y / Length)
-        actual_angle = img_angle + yaw
-    
-        factor = 0.005 * pos[2] # Need To Adjust
+
+        img_angle1 = math.acos(del_y / Length)
+        img_angle2 = math.asin(del_x / Length)
+        
+        if del_x <= 0 and del_y <= 0:
+            img_angle = img_angle1 + math.pi
+        elif del_x >= 0 and del_y <= 0:
+            img_angle = img_angle1
+        elif del_x <= 0 and del_y >= 0:
+            img_angle = img_angle2
+
+        actual_angle = img_angle + yaw + math.pi
+        
+        fac_x = abs(math.cos(actual_angle))
+        fac_y = abs(math.sin(actual_angle))
+
+        if del_x < 0:
+            fac_y *= -1
+        if del_y > 0:
+            fac_x *= -1            
+        
+        factor = 0.003 * pos[2]
         real_length = Length * factor
     
-        real_x = real_length * math.sin(actual_angle) + pos[0]
-        real_y = real_length * math.cos(actual_angle) + pos[1]
+        real_x = real_length * fac_x + pos[0]
+        real_y = real_length * fac_y + pos[1]
     
         return real_x, real_y
 
