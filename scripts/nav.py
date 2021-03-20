@@ -12,6 +12,7 @@ import sys, select, termios, tty
 import tf
 from cv_bridge import CvBridge
 from interiit21_drdo.msg import Setpoints
+import time
 
 pi_2 = math.pi / 2.0
 global KILL_THREAD
@@ -27,8 +28,8 @@ class Controller:
         # rospy.Subscriber("/depth_camera/rgb/image_raw", Image, self.dpcamrgb_callback)
         # rospy.Subscriber("/depth_camera/depth/image_raw", Image, self.dpcam_callback)
         rospy.Subscriber("/camera/color/image_raw", Image, self.downcam_callback)
-        rospy.Subscriber("setpoint_array",Setpoints,self.setpoint_callback)
 
+        self.set_control = rospy.Publisher("/setpoint_array",Setpoints,queue_size=1)
         self.cmd_pos_pub = rospy.Publisher("/mavros/setpoint_position/local", PoseStamped, queue_size=1)
         self.cmd_vel_pub = rospy.Publisher("/mavros/setpoint_velocity/cmd_vel_unstamped", Twist, queue_size=1)
 
@@ -36,7 +37,8 @@ class Controller:
         self.arm_service = rospy.ServiceProxy('/mavros/cmd/arming', CommandBool)
         self.takeoff_service = rospy.ServiceProxy('/mavros/cmd/takeoff', CommandTOL)
 
-        self.epsilon = 0.01
+        rospy.Subscriber("/setpoint_array",Setpoints,self.setpoint_callback)
+        self.epsilon = 0.1
         self.pose = Pose()
         self.state = State()
         self.timestamp = rospy.Time()
@@ -214,20 +216,22 @@ class Controller:
 
     def follow_path(self):
         set_point = self.set_array.pop(0)
+        self.goto(set_point)
         rate = rospy.Rate(10)
         while self.run:
-            if ((self.pose-set_point.x)<self.epsilon):
+            if ((self.dist(self.pose,set_point))<self.epsilon):
                 if len(self.set_array)==0:
                     break
                 else:
                     set_point = self.set_array.pop(0)
+                    self.goto(set_point)
 
             rate.sleep()
         self.run = False
         return 0
     
     def dist(self, poseA, poseB):
-        return (poseA.x-poseB.x)**2 + (poseA.y-poseB.y)**2 + (poseA.z-poseB.z)**2
+        return (poseA.position.x-poseB.position.x)**2 + (poseA.position.y-poseB.position.y)**2 + (poseA.position.z-poseB.position.z)**2
 
 def take_inputs(velocity, controller):
     msg = """
@@ -291,6 +295,32 @@ if __name__ == "__main__":
 
     cont.connect()
     cont.takeoff(takeoff_height)
+
+    time.sleep(10)
+    p1 = Pose()
+    p1.position.x=1
+    p1.position.y=1
+    p1.position.z=3
+
+    p2 = Pose()
+    p2.position.x=-2
+    p2.position.y=1
+    p2.position.z=3
+
+    p3 = Pose()
+    p3.position.x=3
+    p3.position.y=2
+    p3.position.z=3
+    arr = [
+        p1,
+        p2,
+        p3
+    ]
+    temp = Setpoints()
+    temp.header.stamp = rospy.Time.now()
+    temp.setpoints = arr
+
+    cont.set_control.publish(temp)
 
     input_thread = threading.Thread(target=take_inputs, args=(velocity, cont))
     input_thread.start()

@@ -75,3 +75,27 @@ Odometry
 /mavros/local_position/odom	## Accurate but is slow at 5 Hz
 /rtabmap/odom			## Faster method to achive odometry
 ```
+
+Controlling with setpoint
+```bash
+/setpoint_array         ## pass a array of Poses with time stamp
+```
+This topic will be active after launching nav.py
+and custom message is used 
+```bash
+$ rosmsg info interiit21_drdo/Setpoints
+std_msgs/Header header
+  uint32 seq
+  time stamp
+  string frame_id
+geometry_msgs/Pose[] setpoints
+  geometry_msgs/Point position
+    float64 x
+    float64 y
+    float64 z
+  geometry_msgs/Quaternion orientation
+    float64 x
+    float64 y
+    float64 z
+    float64 w
+```

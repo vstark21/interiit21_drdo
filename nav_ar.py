@@ -415,11 +415,6 @@ if __name__ == "__main__":
     cont.connect()
     cont.takeoff(takeoff_height)
 
-    time.sleep(20)
-    cont.goto_xyz_rpy(-10,-10,10,0,0,0)
-    cont.goto_xyz_rpy(-10,10,10,0,0,0)
-
-    time.sleep(10)
     input_thread = threading.Thread(target=take_inputs, args=(velocity, cont,ar))
     input_thread.start()
 
