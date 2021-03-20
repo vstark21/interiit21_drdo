@@ -16,13 +16,8 @@ using namespace octomap;
 
 #define point pair<pair<double, double>, double>
 
-// void print_query_info(point3d query, OcTreeNode* node) {
-//    if (node != NULL) {
-//      cout << "occupancy probability at " << query << ":\t " << node->getOccupancy() << endl;
-//    }
-//    else 
-//      cout << "occupancy probability at " << query << ":\t is unknown" << endl;    
-//  }
+point3d bbx_size(10.0, 2.0, 10.0);
+
 
 void getBoxesBoundingBox(
     const point3d& position,
@@ -115,14 +110,22 @@ void print3d(point3d f3){
 }
 
 bool raycast(point3d src, point3d dest, OcTree* octree){
+    // Returns true if hit, else false
     if(src.y() < 0.3)return true;
     if(dest.y() < 0.3)return true;
     if(src.y() > 4.7)return true;
     if(dest.y() > 4.7)return true;
 
+    if(src == dest)return false;
+
     point3d f3;
     OccupancyOcTreeBase<OcTreeNode>* octree_ = (OccupancyOcTreeBase<OcTreeNode>*) octree;
-    bool ret = octree_->castRay(src, dest-src, f3, true);
+    bool ret = octree_->castRay(src, dest-src, f3, false);
+    // double thresh=100.0;
+    
+    // if(!ret && abs(f3.x()) < thresh && abs(f3.y()) < thresh && abs(f3.z()) < thresh){
+    //     return false;
+    // }
     // cout << "f3 : ";
     // print3d(f3);
     return ret;
@@ -163,6 +166,75 @@ point generate_path(int qidx,
     cout << ": PATH ENDED\n";
     return x;
 
+}
+
+point3d prec(point3d node){
+    double factor = 100.0;
+    int x = node.x() * factor; 
+    int y = node.y() * factor; 
+    int z = node.z() * factor; 
+    point3d prec_node(x / factor, y / factor, z / factor);
+    return prec_node;
+}
+
+bool check_occupancy(point3d g, OcTree* octree){
+    point3d size(0.5, 0.5, 0.5);
+    point3d bbx_min = g - size;
+    point3d bbx_max = g + size;
+
+    for (OcTree::leaf_bbx_iterator
+           it = octree->begin_leafs_bbx(bbx_min, bbx_max),
+           end = octree->end_leafs_bbx();
+       it != end; ++it) {
+           if(octree->isNodeOccupied(*it))return true;
+    }
+    return false;
+}
+
+point3d decide(point3d current, point3d prev, point3d orien, OcTree* octree){
+
+    double length = 3.0;
+    point3d pull;
+    if(current.y() <= 3.0){
+        point3d pull_(0.0, 0.1*pow(3.0 - current.y(), 2), 0.0);
+        pull = pull_;
+    }
+    else{
+        point3d pull_(0.0, -0.1 * pow(3.0 - current.y(), 2), 0.0);
+        pull = pull_;
+    }
+
+    point3d f1(orien.x(), 0.0, orien.z());
+    point3d f2(prev.x() - current.x(), 0.0, prev.z() - current.z());
+
+    
+    point3d orien_norm = f1.normalize();
+
+    point3d prev_norm = f2.normalize();
+    
+    // if(prev_norm.y() + orien_norm.y() )
+    point3d new_dir = prev_norm + orien_norm + pull;
+    point3d new_dir_norm = new_dir.normalize();
+
+    new_dir = prec(new_dir_norm * length);
+
+    while(check_occupancy(new_dir + current, octree)){
+        length += 0.5;
+        new_dir = prec(new_dir_norm * length);
+    }
+    // point3d new_bbx(length, bbx_size.y(), length);
+    // bbx_size = new_bbx;
+    cout << length << endl;
+    if(new_dir.y() + current.y() >= 0.5 && new_dir.y() + current.y() <= 4.5){
+        return new_dir + current;
+    }
+    if(new_dir.y() + current.y() < 0.5){
+        point3d ans(new_dir.x() + current.x(), 0.5, new_dir.z() + current.z());
+        return ans;
+    }
+    point3d ans(new_dir.x() + current.x(), 4.5, new_dir.z() + current.z());
+
+    return ans;
 }
 
 point Astar(point3d current, point3d dest, vector<point>& mp, OcTree* octree){
@@ -243,9 +315,7 @@ point Astar(point3d current, point3d dest, vector<point>& mp, OcTree* octree){
     
 
     priority_queue<pair<double, int>, vector<pair<double, int>>, greater<pair<double, int>>> openpq;
-    // map<int, int> openmp;
-    // map<int, int> closemp;
-    // map<int, int> parent;
+
     int openarray[numVertices];
     int closearray[numVertices];
     int parent[numVertices];
@@ -284,183 +354,10 @@ point Astar(point3d current, point3d dest, vector<point>& mp, OcTree* octree){
                 f[el] = g[el] + h[el];
                 openpq.push({f[el], el});
             }
-                        
-
-            // h[el] = l2_norm(target, mp[el]);
-            // f[el] = g[el] + h[el];
-
-            // if(openarray[el] < f[el])continue;
-
-            // if(closearray[el] < f[el])continue;
-
-            // parent[el] = q.second;
-            // openpq.push({f[el], el});
-            // openarray[el] = f[el];
+                       
         }
-        // closearray[q.second] = f[q.second];
     }
     cout << "NO PATH FOUND\n";
     return start;
 }
 
-// point3d calc_dest(point3d current){
-//     point3d dest(current.x()+5.0, current.y(), current.z());
-//     return dest;
-// }
-
-// int main() {
-
-//     while(1){
-        
-//         octomap_msgs/Octomap msg;
-//         //AbstractOcTree* tree= msgToMap( msg);
-//         AbstractOcTree* tree= fullMsgToMap( msg);
-
-
-//         // AbstractOcTree* tree = AbstractOcTree::read("/home/vishwas/Downloads/octomap.ot");
-//         // cout << "Tree size : " << tree->size() << endl;
-//         // // OcTree* octree = dynamic_cast<OcTree*>(tree);
-//         OcTree* octree = (OcTree*)tree;
-
-
-//         point3d current(10.0, 1.0, 0.0);
-//         point3d bbx_size(5.0, 1.5, 5.0);
-//         point3d dest = calc_dest(current);
-
-//         vector<pair<point3d, double>> box_vector;
-
-//         getBoxesBoundingBox(current, bbx_size, &box_vector, octree);
-
-//         cout << "Size of box_vector : " << box_vector.size() << endl;
-
-//         map<point, int> m;
-//         for(int i=0;i<box_vector.size();i++){
-//             find_corners(box_vector[i].first, box_vector[i].second, m);
-//         } 
-//         cout << "Size of map : " << m.size() << endl;
-
-//         int count = 0;
-//         for(auto i:m){
-//             if(i.second == 1)count +=1;
-//         } 
-//         cout << "Count : " << count << endl;
-
-//         vector<point> mp;
-//         for(auto i:m){
-//             // if(i.second == 1)
-//             mp.push_back(i.first);
-//         }
-
-
-
-//         Astar(current, dest, mp, octree);
-
-//         usleep(1000);
-//     }
-// 	return 0;
-// }
-
-    // OccupancyOcTreeBase<OcTreeNode>* octree_ = (OccupancyOcTreeBase<OcTreeNode>*) octree;
-
-
-    // point3d f4;
-
-    // point3d current1(0.0, 1.0, 0.0);
-    // point3d dest1(0.0, 1.0, 7.0);
-    // bool ans = octree_->castRay(current1, dest1-current1, f4, true);
-    // print3d(f4);
-    // cout << "dfgdfg : " << ans << endl;
-
-    // point3d current2(0.0, 0.0, 1.0);
-    // point3d dest2(0.0, 7.0, 1.0);
-    // ans = octree_->castRay(current2, dest2-current2, f4, true);
-    // print3d(f4);
-    // cout << "dfgdfg : " << ans << endl;
-
-    // point3d current3(1.0, 0.0, 0.0);
-    // point3d dest3(1.0, 0.0, 7.0);
-    // ans = octree_->castRay(current3, dest3-current3, f4, true);
-    // print3d(f4);
-    // cout << "dfgdfg : " << ans << endl;
-
-    // point3d current4(1.0, 0.0, 0.0);
-    // point3d dest4(1.0, 7.0, 0.0);
-    // ans = octree_->castRay(current4, dest4-current4, f4, true);
-    // print3d(f4);
-    // cout << "dfgdfg : " << ans << endl;
-
-    // point3d current5(0.0, 0.0, 1.0);
-    // point3d dest5(7.0, 0.0, 1.0);
-    // ans = octree_->castRay(current5, dest5-current5, f4, true);
-    // print3d(f4);
-    // cout << "dfgdfg : " << ans << endl;
-
-    // point3d current6(0.0, 1.0, 0.0);
-    // point3d dest6(7.0, 1.0, 0.0);
-    // ans = octree_->castRay(current6, dest6-current6, f4, true);
-    // print3d(f4);
-    // cout << "dfgdfg : " << ans << endl;
-
-
-
-
-    
-    // point3d f1(mp[0].first.first, mp[0].first.second, mp[0].second);
-    // point3d f2(mp[1].first.first, mp[1].first.second, mp[1].second);
-    // point3d f3;
-
-    // point3d f4;
-    // for(double i=-2.0;i<=5.0;i+=1.0){
-    //     for(double j=-2.0;j<=5.0;j+=1.0){
-    //         point3d current1(i, i, 5.0);
-    //         point3d dest1(j, j, 5.0);
-    //         bool ans = octree_->castRay(current1, dest1-current1, f4, false);
-    //         cout << "dfgdfg : " << ans << endl;
-    //     }
-    // }
-
-    // cout << octree_->castRay(f1, f2-f1, f3, true) << endl;
-
-    // print3d(f1);
-    // print3d(f2);
-    // print3d(f2-f1);
-    // print3d(f3);
-
-    
-
-
-
-    // if(octree == NULL)cout << "GREAT!\n";
-
-    // point3d q (0., 0., 0.);
-    // int i=0;
-    // for(auto& el:*octree){
-    //     if(i>100)break;
-    //     cout << el.getValue();
-    //     i+=1;
-    // }
-    // OcTreeNode* result = octree->
-
-    // OcTree* root = (OcTree*)(octree->getRoot());
-    
-
-    // print_query_info(q, result);
-    // cout << result->getValue();
-
-
-    // for(int i=0;i<10;i+=1){
-        // OcTreeNode* temp;
-        // octree->getNodeChild(temp, 0);
-        // octree = (OcTree*) temp;
-
-    // }
-    // cout << c->getValue();
-
-    // for(OcTree::tree_iterator it=octree->begin_tree(), 
-    //         end=octree->end_tree(); it!=end; ++it){
-    //         cout << "Node center: " << it.getCoordinate() << endl;
-    //         cout << "Node size: " << it.getSize() << endl;
-    //         cout << "Node value: " << it->getValue() << endl;
-    //         }
-
-    // cout << "Working\n";
