@@ -148,13 +148,11 @@ class Aruco_land():
         Centres = []
         for contour in contours:
             if cv2.contourArea(contour) > 150:
-                _, _, w, h = cv2.boundingRect(contour)
-                if w/h > 0.5:
-                    M = cv2.moments(contour)
-                    cx = int(M['m10']/M['m00'])
-                    cy = int(M['m01']/M['m00'])
+                M = cv2.moments(contour)
+                cx = int(M['m10']/M['m00'])
+                cy = int(M['m01']/M['m00'])
                     
-                    Centres.append([cx,cy])
+                Centres.append([cx,cy])
         
         return Centres
 
@@ -224,7 +222,7 @@ class Aruco_land():
             world_pos = self.World_Pos(yaw, pos, Centre)
             Flag = False
             for P in self.Visited_Aruco:
-                if self.Distance(P, world_pos) < 20: # Need To Adjust (Threshold to Avoid Same Aruco)
+                if self.Distance(P, world_pos) < 0.6: # Threshold to Avoid Same Aruco
                     Flag = True
                     break
             if not Flag:
@@ -248,7 +246,7 @@ class Aruco_land():
             world_pos = self.World_Pos(yaw, pos, Centre)
             Flag = False
             for P in self.Visited_Aruco:
-                if self.Distance(P, world_pos) < 50: # Need To Adjust (Threshold to Avoid White Points Of Same Aruco)
+                if self.Distance(P, world_pos) < 1.1: # Threshold to Avoid White Points Of Same Aruco
                     Flag = True
                     break
             if not Flag:
