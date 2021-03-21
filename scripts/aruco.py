@@ -105,17 +105,20 @@ class Controller:
             rospy.loginfo(e)
 
 class Aruco_land():
-    def __init__(self, pos):
-        self.optimal_length = 100 # Need To Adjust
-        self.Square = [[pos[0] - int(self.optimal_length / 2), pos[1]],
-                  [pos[0] + int(self.optimal_length / 2), pos[1]],
-                  [pos[0] + int(self.optimal_length / 2), pos[1] + self.optimal_length],
-                  [pos[0] - int(self.optimal_length / 2), pos[1] + self.optimal_length]]
-    
-        self.Visited = [] # For Aruco Visited Centre's
-        self.Visited_Points = [pos[:2][:]] # For Any Visited Point (For No Point Of Detection)
+    def __init__(self):
+        self.optimal_length = 100 # Need To Adjust (Random Area Square Length)
+        self.Flag = False # Flag For Random Area Square Initialization
+        self.Visited_Aruco = []
+        self.Visited_Points = []
         self.aruco_dict = aruco.Dictionary_get(aruco.DICT_5X5_1000)
     
+    def Initialize_Area(self, pos):
+        self.Flag = True
+        self.Square = [[pos[0] - int(self.optimal_length / 2), pos[1]],
+                       [pos[0] + int(self.optimal_length / 2), pos[1]],
+                       [pos[0] + int(self.optimal_length / 2), pos[1] + self.optimal_length],
+                       [pos[0] - int(self.optimal_length / 2), pos[1] + self.optimal_length]]
+
     def Aruco(self, img):
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         _, thresh = cv2.threshold(gray,150,255,cv2.THRESH_BINARY)
@@ -130,7 +133,7 @@ class Aruco_land():
                 return [[x,y]], True
         
             Centres.append([x,y])
-    
+
         return Centres, False
 
     def White_Points(self, img):
@@ -169,10 +172,10 @@ class Aruco_land():
         
         if del_x <= 0 and del_y <= 0:
             img_angle = img_angle1 + math.pi
-        elif del_x >= 0 and del_y <= 0:
-            img_angle = img_angle1
         elif del_x <= 0 and del_y >= 0:
             img_angle = img_angle2
+        else:
+            img_angle = img_angle1
 
         actual_angle = img_angle + yaw + math.pi
         
@@ -200,7 +203,7 @@ class Aruco_land():
         x, y, w, h = cv2.boundingRect(Area)
         x -= c
         y -= c
-    
+        
         cx, cy = int((self.Square[0][0] + self.Square[2][0]) / 2), int((self.Square[0][1] + self.Square[2][1]) / 2)
         Quad_Area = ((self.optimal_length**2) / 2) - np.array([max(0,((cy - y) * (cx - x))),
                                                                max(0,((cy - y) * (x + w - cx))),
@@ -214,26 +217,38 @@ class Aruco_land():
     
         if Flag:
             cx, cy = self.World_Pos(yaw, pos, Centres[0])
-            return [cx, cy, pos[2]], True
-    
+            return [cx, cy, 0.23], True
+        
+        Unvisited = []
         for Centre in Centres:
             world_pos = self.World_Pos(yaw, pos, Centre)
             Flag = False
-            for P in self.Visited:
-                if self.Distance(P, world_pos) < 20:
+            for P in self.Visited_Aruco:
+                if self.Distance(P, world_pos) < 20: # Need To Adjust (Threshold to Avoid Same Aruco)
                     Flag = True
                     break
             if not Flag:
-                self.Visited.append(world_pos)
-    
-        Unvisited = []
+                Unvisited.append([self.Distance(pos, world_pos), world_pos])
+        
+        if len(Unvisited):
+            Unvisited = sorted(Unvisited)
+            cx, cy = Unvisited[0][1]
+            self.Visited_Points.append([int(cx),int(cy)])
+            self.Visited_Aruco.append([cx,cy])
+
+            if not self.Flag:
+                self.Initialize_Area(pos)
+
+            return [cx, cy, pos[2]], False
+
         Centres = self.White_Points(img)
     
+        Unvisited = []
         for Centre in Centres:
             world_pos = self.World_Pos(yaw, pos, Centre)
             Flag = False
-            for P in self.Visited:
-                if self.Distance(P, world_pos) < 50:
+            for P in self.Visited_Aruco:
+                if self.Distance(P, world_pos) < 50: # Need To Adjust (Threshold to Avoid White Points Of Same Aruco)
                     Flag = True
                     break
             if not Flag:
@@ -243,9 +258,16 @@ class Aruco_land():
             Unvisited = sorted(Unvisited)
             cx, cy = Unvisited[0][1]
             self.Visited_Points.append([int(cx),int(cy)])
+
+            if not self.Flag:
+                self.Initialize_Area(pos)
+
             return [cx, cy, pos[2]], False
-    
-        return self.No_Point(pos), False
+        
+        if self.Flag:
+            return self.No_Point(pos), False
+
+        return None, False # Need To Go Forward In Place Of None
 
 if __name__ == "__main__":
     #ar=Aruco_land()
