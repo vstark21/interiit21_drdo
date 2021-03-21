@@ -92,6 +92,7 @@ class Controller:
     def goto(self, pose):
         pose_stamped = PoseStamped()
         pose_stamped.header.stamp = self.timestamp
+        pose_stamped.header.frame_id='map'
         pose_stamped.pose = pose
 
         self.cmd_pos_pub.publish(pose_stamped)

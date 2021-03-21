@@ -15,6 +15,7 @@ bool map_empty = true;
 bool odom_empty = true;
 point3d Current(10.0, 1.0, 0.0);
 point3d Orien(-10.0, 0.0, 7.0); // sy 0 cy
+
 void octomap_callback(const octomap_msgs::Octomap &msg)
 {
     Tree = octomap_msgs::fullMsgToMap(msg);
@@ -26,16 +27,16 @@ void octomap_callback(const octomap_msgs::Octomap &msg)
 void odom_callback(const nav_msgs::Odometry &msg)
 {
     ROS_INFO("ODOM");
-    Current = point3d(-msg.pose.pose.position.x, msg.pose.pose.position.z, msg.pose.pose.position.y);
+    Current = point3d(msg.pose.pose.position.x, msg.pose.pose.position.y, msg.pose.pose.position.z);
     tf::Quaternion q(
         msg.pose.pose.orientation.x,
         msg.pose.pose.orientation.y,
         msg.pose.pose.orientation.z,
         msg.pose.pose.orientation.w);
     tf::Matrix3x3 m(q);
-    double roll, pitch, yaw;
-    m.getRPY(roll, pitch, yaw);
-    Orien = point3d(sin(yaw),0,cos(yaw));
+    tf::Vector3 dummy(0,0,1);
+    tf::Vector3 final = m*dummy;
+    Orien = point3d(final.x(), final.y(), final.z());
     odom_empty = false;
 }
 
@@ -73,18 +74,19 @@ int main(int argc, char **argv){
     //OcTree* octree = (OcTree*)tree;
     
     // Need to read position and orientation of drone
-    point3d prev = Current;
+    
     //sy 0 cy
 
     
     ros::Rate loop_rate(10);
-    while (map_empty || odom_empty){
+    while (ros::ok() &&(map_empty || odom_empty)){
         ROS_INFO("INSIDE WHILE");
         ros::spinOnce();
         loop_rate.sleep();
     }
+    point3d prev = Current;
     ROS_INFO("started");
-    for(int check=0;check<10;check++){
+    for(int check=0;ros::ok()&&(check<1);check++){
         ROS_INFO("IN FOR LOOP CURRENT:");
         print3d(Current);
         point3d dest = decide(Current, prev, Orien, Octree);
@@ -133,18 +135,20 @@ int main(int argc, char **argv){
         interiit21_drdo::Setpoints temp;
         //temp.setpoints(vector<geometry_msgs::Pose>) ;
         geometry_msgs::Pose p;
-        p.position.x = -x.first.first;
-        p.position.y = x.second;
-        p.position.z = x.first.second;
+        p.position.x = x.first.first;
+        p.position.y = x.first.second;
+        p.position.z = x.second;
         temp.setpoints.push_back(p);
         temp.header.stamp = ros::Time::now();
+        temp.header.frame_id = 'map';
         setpoint_control.publish(temp);
         //Current = new_x;
         odom_empty = true;
         ros::spinOnce();
-        while(odom_empty){
+        while(ros::ok()&&odom_empty){
             ros::spinOnce();
             loop_rate.sleep();
+            ros::Duration(2.0).sleep();
         }
     }
     
