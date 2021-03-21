@@ -105,49 +105,42 @@ class Controller:
             rospy.loginfo(e)
 
 class Aruco_land():
-    def __init__(self):
-        
-        optimal_length = 100 # Need To Be Adjust
-        self.Square = [(pos[0] - optimal_length,pos[1]),
-                (pos[0] + optimal_length,pos[1]),
-                (pos[0] - optimal_length,pos[1] + optimal_length),
-                (pos[0] + optimal_length,pos[1] + optimal_length)]
-        
-        self.Visited = []
+    def __init__(self, pos):
+        self.optimal_length = 100 # Need To Adjust
+        self.Square = [[pos[0] - int(self.optimal_length / 2), pos[1]],
+                  [pos[0] + int(self.optimal_length / 2), pos[1]],
+                  [pos[0] + int(self.optimal_length / 2), pos[1] + self.optimal_length],
+                  [pos[0] - int(self.optimal_length / 2), pos[1] + self.optimal_length]]
+    
+        self.Visited = [] # For Aruco Visited Centre's
+        self.Visited_Points = [pos[:2][:]] # For Any Visited Point (For No Point Of Detection)
         self.aruco_dict = aruco.Dictionary_get(aruco.DICT_5X5_1000)
-        self.set_control = rospy.Publisher("/setpoint_array",Setpoints,queue_size=1)
-
-
-    def Aruco(self,img):
+    
+    def Aruco(self, img):
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        _, thresh = cv2.threshold(gray,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+        _, thresh = cv2.threshold(gray,150,255,cv2.THRESH_BINARY)
         corners, ids, _ = aruco.detectMarkers(thresh, self.aruco_dict, parameters=aruco.DetectorParameters_create())
-        
+ 
         Centres = []
         for i, corner in enumerate(corners):
             x = int((corner[0][0][0] + corner[0][2][0]) / 2)
             y = int((corner[0][0][1] + corner[0][2][1]) / 2)
             
             if ids[i][0] == 0:
-                return [(x,y)], True
-            
-            Centres.append((x,y))
+                return [[x,y]], True
         
+            Centres.append([x,y])
+    
         return Centres, False
 
-    def White_Points(self,img):
-        mask = cv2.inRange(img, np.array([100,100,100]), np.array([255,255,255]))
-        img = cv2.bitwise_and(img, img, mask = mask)
-        
+    def White_Points(self, img):
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-        blur = cv2.GaussianBlur(gray,(5,5),0)
-        _, thresh = cv2.threshold(blur,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-        
+        _, thresh = cv2.threshold(gray,150,255,cv2.THRESH_BINARY)
+    
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5,5))
-        thresh = cv2.morphologyEx(thresh, cv2.MORPH_CROSS, kernel, iterations = 5)
+        thresh = cv2.morphologyEx(thresh, cv2.MORPH_DILATE, kernel, iterations = 5)
 
-        _,contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+        contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
 
         Centres = []
         for contour in contours:
@@ -158,34 +151,73 @@ class Aruco_land():
                     cx = int(M['m10']/M['m00'])
                     cy = int(M['m01']/M['m00'])
                     
-                    Centres.append((cx,cy))
-                    
+                    Centres.append([cx,cy])
+        
         return Centres
 
-    def Distance(self,A,B):
-        return ((B[0] - A[0])**2 + (B[1] - A[1])**2)**(1/2)
+    def Distance(self, A, B):
+        return math.sqrt(((B[0] - A[0])**2) + ((B[1] - A[1])**2))
 
-    def World_Pos(self,pitch, pos, centre):
-        del_x = centre[0] - 480
-        del_y = centre[1] - 640
-        Complex = complex(math.cos(pitch), math.sin(pitch)) * complex(del_x, del_y)
-        k = 100 ## Need to be Adjusted
-        x = pos[0] + Complex.real / (k * pos[2])
-        y = pos[1] + Complex.imag / (k * pos[2])
-        return x, y
+    def World_Pos(self, yaw, pos, centre):
+        del_x = centre[0] - 320
+        del_y = 240 - centre[1]
+    
+        Length = self.Distance(centre, (320, 240))
 
-    def No_Point(self):
-        pass
+        img_angle1 = math.acos(del_y / Length)
+        img_angle2 = math.asin(del_x / Length)
+        
+        if del_x <= 0 and del_y <= 0:
+            img_angle = img_angle1 + math.pi
+        elif del_x >= 0 and del_y <= 0:
+            img_angle = img_angle1
+        elif del_x <= 0 and del_y >= 0:
+            img_angle = img_angle2
 
-    def Main(self,img, pos, pitch):
+        actual_angle = img_angle + yaw + math.pi
+        
+        fac_x = abs(math.cos(actual_angle))
+        fac_y = abs(math.sin(actual_angle))
+
+        if del_x < 0:
+            fac_y *= -1
+        if del_y > 0:
+            fac_x *= -1            
+        
+        factor = 0.003 * pos[2]
+        real_length = Length * factor
+    
+        real_x = real_length * fac_x + pos[0]
+        real_y = real_length * fac_y + pos[1]
+    
+        return real_x, real_y
+
+    def No_Point(self, pos):
+        Area = np.array(self.Visited_Points)  
+        c = abs(Area.min())
+        Area += c
+    
+        x, y, w, h = cv2.boundingRect(Area)
+        x -= c
+        y -= c
+    
+        cx, cy = int((self.Square[0][0] + self.Square[2][0]) / 2), int((self.Square[0][1] + self.Square[2][1]) / 2)
+        Quad_Area = ((self.optimal_length**2) / 2) - np.array([max(0,((cy - y) * (cx - x))),
+                                                               max(0,((cy - y) * (x + w - cx))),
+                                                               max(0,((y + h - cy) * (x + w - cx))),
+                                                               max(0,((y + h - cy) * (cx - x)))])
+        best_point = self.Square[np.argmax(Quad_Area)]
+        return [best_point[0], best_point[1], pos[2]]
+
+    def Main(self, img, pos, yaw):
         Centres, Flag = self.Aruco(img)
-        
+    
         if Flag:
-            cx, cy = self.World_Pos(pitch, pos, Centres[0])
-            return (cx, cy, pos[2]), True
-        
+            cx, cy = self.World_Pos(yaw, pos, Centres[0])
+            return [cx, cy, pos[2]], True
+    
         for Centre in Centres:
-            world_pos = self.World_Pos(pitch, pos, Centre)
+            world_pos = self.World_Pos(yaw, pos, Centre)
             Flag = False
             for P in self.Visited:
                 if self.Distance(P, world_pos) < 20:
@@ -193,12 +225,12 @@ class Aruco_land():
                     break
             if not Flag:
                 self.Visited.append(world_pos)
-        
+    
         Unvisited = []
         Centres = self.White_Points(img)
-        
+    
         for Centre in Centres:
-            world_pos = self.World_Pos(pitch, pos, Centre)
+            world_pos = self.World_Pos(yaw, pos, Centre)
             Flag = False
             for P in self.Visited:
                 if self.Distance(P, world_pos) < 50:
@@ -206,29 +238,14 @@ class Aruco_land():
                     break
             if not Flag:
                 Unvisited.append([self.Distance(pos, world_pos), world_pos])
-        
+    
         if len(Unvisited):
             Unvisited = sorted(Unvisited)
             cx, cy = Unvisited[0][1]
-            ## Wrong coordnates
-        
-            temp = Setpoints()
-            a = Pose()
-            a.position.x = cx
-            a.position.y = cy
-            a.position.z = pos[-1]
-            temp.setpoints = [a]
-            temp.header.stamp = rospy.Time.now()
-        
-            #self.set_control.publish(temp)
-            return (cx, cy, pos[2]), False
-        
-        
-        
-
-        return self.No_Point()
-        
-
+            self.Visited_Points.append([int(cx),int(cy)])
+            return [cx, cy, pos[2]], False
+    
+        return self.No_Point(pos), False
 
 if __name__ == "__main__":
     #ar=Aruco_land()
