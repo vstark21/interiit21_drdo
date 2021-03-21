@@ -34,7 +34,7 @@ void odom_callback(const nav_msgs::Odometry &msg)
         msg.pose.pose.orientation.z,
         msg.pose.pose.orientation.w);
     tf::Matrix3x3 m(q);
-    tf::Vector3 dummy(0,0,1);
+    tf::Vector3 dummy(1,0,0);
     tf::Vector3 final = m*dummy;
     Orien = point3d(final.x(), final.y(), final.z());
     odom_empty = false;
@@ -84,12 +84,15 @@ int main(int argc, char **argv){
         ros::spinOnce();
         loop_rate.sleep();
     }
-    point3d prev = Current;
+    point3d ref_current = Current;
+    point3d prev = ref_current, ref_orien = Orien;
+    octomap::OcTree* ref_octree = Octree;
     ROS_INFO("started");
     for(int check=0;ros::ok()&&(check<1);check++){
+    
         ROS_INFO("IN FOR LOOP CURRENT:");
-        print3d(Current);
-        point3d dest = decide(Current, prev, Orien, Octree);
+        print3d(ref_current);
+        point3d dest = decide(ref_current, prev, ref_orien, ref_octree);
         ROS_INFO("DEST : ");
         print3d(dest);
         // print3d(bbx_size);
@@ -97,7 +100,7 @@ int main(int argc, char **argv){
         //print3d(Current);
         vector<pair<point3d, double>> box_vector;
 
-        getBoxesBoundingBox(Current, bbx_size, &box_vector, Octree);
+        getBoxesBoundingBox(ref_current, bbx_size, &box_vector, ref_octree);
 
         ROS_INFO("Size of box_vector : %d",(int)box_vector.size());
 
@@ -105,7 +108,7 @@ int main(int argc, char **argv){
         for(int i=0;i<box_vector.size();i++){
             find_corners(box_vector[i].first, box_vector[i].second, m);
         } 
-        ROS_INFO("Size of map : %d",m.size() );
+        ROS_INFO("Size of map : %d",(int)m.size() );
 
         // int count = 0;
         // for(auto i:m){
@@ -120,8 +123,8 @@ int main(int argc, char **argv){
 
 
         //print3d(Current);// 
-        pair< pair<double, double> , double> x1 = Astar(Current, dest, mp, Octree);
-        pair< pair<double, double> , double> x = drone_crash(Current, x1, Octree, 0);
+        pair< pair<double, double> , double> x1 = Astar(ref_current, dest, mp, ref_octree);
+        pair< pair<double, double> , double> x = drone_crash(ref_current, x1, ref_octree, 0);
         
         //point3d new_orien(x.first.fir//st - Current.x(), 
         //                x.first.second - Current.y(), 
@@ -140,7 +143,7 @@ int main(int argc, char **argv){
         p.position.z = x.second;
         temp.setpoints.push_back(p);
         temp.header.stamp = ros::Time::now();
-        temp.header.frame_id = 'map';
+        temp.header.frame_id = "map";
         setpoint_control.publish(temp);
         //Current = new_x;
         odom_empty = true;
@@ -148,8 +151,11 @@ int main(int argc, char **argv){
         while(ros::ok()&&odom_empty){
             ros::spinOnce();
             loop_rate.sleep();
-            ros::Duration(2.0).sleep();
         }
+        ros::Duration(2.0).sleep();
+        ref_current = Current;
+        ref_orien = Orien;
+        ref_octree = Octree;
     }
     
     return 0;
