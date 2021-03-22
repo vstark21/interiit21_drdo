@@ -292,13 +292,13 @@ if __name__ == "__main__":
     cont = Controller()
 
     # Flight variables
-    takeoff_height = 5
+    takeoff_height = 3
     velocity = 0.6
 
     cont.connect()
     cont.takeoff(takeoff_height)
 
-    #time.sleep(10)
+    #time.sleep(5)
     p1 = Pose()
     p1.position.x=1
     p1.position.y=1
