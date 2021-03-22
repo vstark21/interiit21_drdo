@@ -106,18 +106,27 @@ class Controller:
 
 class Aruco_land():
     def __init__(self):
-        self.optimal_length = 100 # Need To Adjust (Random Area Square Length)
-        self.Flag = False # Flag For Random Area Square Initialization
+        self.Flag = False
+        self.Landed = False
         self.Visited_Aruco = []
         self.Visited_Points = []
         self.aruco_dict = aruco.Dictionary_get(aruco.DICT_5X5_1000)
     
-    def Initialize_Area(self, pos):
+    def Initialize_Limits(self, yaw, pos):
         self.Flag = True
-        self.Square = [[pos[0] - int(self.optimal_length / 2), pos[1]],
-                       [pos[0] + int(self.optimal_length / 2), pos[1]],
-                       [pos[0] + int(self.optimal_length / 2), pos[1] + self.optimal_length],
-                       [pos[0] - int(self.optimal_length / 2), pos[1] + self.optimal_length]]
+
+        optimal_length = 5
+        Array = np.array(pos[:2]) - np.array(self.World_Pos(yaw, pos, [0, 240]))
+        index = np.argmax(abs(Array))
+
+        self.Left =  [index, pos[index] - (int(Array[index]/abs(Array[index])) * optimal_length)]
+        self.Right = [index, pos[index] + (int(Array[index]/abs(Array[index])) * optimal_length)]
+        
+        Array = np.array(self.World_Pos(yaw, pos, [320, 0])) - np.array(pos[:2])
+        index = np.argmax(abs(Array))
+
+        self.Front = [index, int(Array[index]/abs(Array[index])) * optimal_length]
+        self.last_move = 'L'
 
     def Aruco(self, img):
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -194,35 +203,50 @@ class Aruco_land():
         return real_x, real_y
 
     def No_Point(self, pos):
-        Area = np.array(self.Visited_Points)  
-        c = abs(Area.min())
-        Area += c
-    
-        x, y, w, h = cv2.boundingRect(Area)
-        x -= c
-        y -= c
-        
-        cx, cy = int((self.Square[0][0] + self.Square[2][0]) / 2), int((self.Square[0][1] + self.Square[2][1]) / 2)
-        Quad_Area = ((self.optimal_length**2) / 2) - np.array([max(0,((cy - y) * (cx - x))),
-                                                               max(0,((cy - y) * (x + w - cx))),
-                                                               max(0,((y + h - cy) * (x + w - cx))),
-                                                               max(0,((y + h - cy) * (cx - x)))])
-        best_point = self.Square[np.argmax(Quad_Area)]
-        return [best_point[0], best_point[1], pos[2]]
+        left_distance = abs(pos[self.Left[0]] - self.Left[1])
+        right_distance = abs(pos[self.Right[0]] - self.Right[1])
+
+        if left_distance < 0.3 or right_distance < 0.3:
+            if self.last_move == 'L':
+                self.last_move = 'R'
+            elif self.last_move == 'R':
+                self.last_move = 'L'
+            
+            Point = pos[:2][:]
+            Point[self.Front[0]] += self.Front[1]
+
+            return [Point[0], Point[1], 3.0]
+        elif self.last_move == 'L':
+            Point = pos[:2][:]
+            Point[self.Right[0]] = self.Right[1]
+
+            return [Point[0], Point[1], 3.0]
+        elif self.last_move == 'R':
+            Point = pos[:2][:]
+            Point[self.Left[0]] = self.Left[1]
+
+            return [Point[0], Point[1], 3.0]
 
     def Main(self, img, pos, yaw):
+        if self.Landed:
+            return None
+
         Centres, Flag = self.Aruco(img)
     
         if Flag:
             cx, cy = self.World_Pos(yaw, pos, Centres[0])
-            return [cx, cy, 0.23], True
+            if self.Distance([cx,cy], pos[:2]) < 0.6 and pos[2] > 2.6:
+                return [cx, cy, 2.0]
+            elif self.Distance([cx,cy], pos[:2]) < 0.35 and pos[2] > 1.6:
+                self.Landed = True
+                return [cx, cy, 0.23]
         
         Unvisited = []
         for Centre in Centres:
             world_pos = self.World_Pos(yaw, pos, Centre)
             Flag = False
             for P in self.Visited_Aruco:
-                if self.Distance(P, world_pos) < 0.6: # Threshold to Avoid Same Aruco
+                if self.Distance(P, world_pos) < 0.6:
                     Flag = True
                     break
             if not Flag:
@@ -232,12 +256,13 @@ class Aruco_land():
             Unvisited = sorted(Unvisited)
             cx, cy = Unvisited[0][1]
             self.Visited_Points.append([int(cx),int(cy)])
-            self.Visited_Aruco.append([cx,cy])
-
+            
+            if Unvisited[0][0] < 0.6:
+                self.Visited_Aruco.append([cx,cy])
             if not self.Flag:
-                self.Initialize_Area(pos)
+                self.Initialize_Limits(yaw, pos)
 
-            return [cx, cy, pos[2]], False
+            return [cx, cy, 3.0]
 
         Centres = self.White_Points(img)
     
@@ -246,7 +271,7 @@ class Aruco_land():
             world_pos = self.World_Pos(yaw, pos, Centre)
             Flag = False
             for P in self.Visited_Aruco:
-                if self.Distance(P, world_pos) < 1.1: # Threshold to Avoid White Points Of Same Aruco
+                if self.Distance(P, world_pos) < 1.1:
                     Flag = True
                     break
             if not Flag:
@@ -258,15 +283,13 @@ class Aruco_land():
             self.Visited_Points.append([int(cx),int(cy)])
 
             if not self.Flag:
-                self.Initialize_Area(pos)
+                self.Initialize_Limits(yaw, pos)
 
-            return [cx, cy, pos[2]], False
+            return [cx, cy, 3.0]
         
         if self.Flag:
-            return self.No_Point(pos), False
-
-        return None, False # Need To Go Forward In Place Of None
-
+            return self.No_Point(pos)
+       
 if __name__ == "__main__":
     #ar=Aruco_land()
     cont = Controller()
