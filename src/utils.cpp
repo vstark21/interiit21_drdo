@@ -74,7 +74,7 @@ void insert(pair< pair<double, double> , double> p, map< pair< pair<double, doub
 
 void find_corners(point3d p, double d, map< pair< pair<double, double> , double>, int>& m){
     // d*=0.9;
-    double dronex = 0.47, droney = 0.47, dronez = 0.23;
+    double dronex = 0.6, droney = 0.6, dronez = 0.4;
     // for(int i=-1; i<=1; i+=2){
     //     for(int j=-1;j<=1;j+=2){
     //         for(int k=-1;k<=1;k+=2){
@@ -193,7 +193,7 @@ bool check_occupancy(point3d g, OcTree* octree){
 
 point3d decide(point3d current, point3d prev, point3d orien, OcTree* octree){
 
-    double length = 2.0;
+    double length = 3.0;
     point3d pull;
     if(current.z() <= 3.0){
         point3d pull_(0.0, 0.0, 0.1*pow(3.0 - current.z(), 2));
@@ -251,7 +251,7 @@ pair< pair<double, double> , double> Astar(point3d current, point3d dest, vector
     int numVertices = mp.size();
     vector<int> adj[numVertices];
     
-    if(!raycast(current, dest, octree, false)){
+    if(!raycast(current, dest, octree)){
         cout << "DIRECT PATH FOUND!\n";
         return target;
     }
@@ -269,11 +269,16 @@ pair< pair<double, double> , double> Astar(point3d current, point3d dest, vector
 
     for(int i=0;i<mp.size()-1;i+=1){
         for(int j=i+1;j<mp.size();j+=1){
-
+            if(i==(mp.size()-2) && j==(mp.size()-1))continue;
             point3d f1(mp[i].first.first, mp[i].first.second, mp[i].second);
             point3d f2(mp[j].first.first, mp[j].first.second, mp[j].second);
-
-            bool ret = raycast(f1, f2, octree, false);
+            bool ret;
+            if(j==(mp.size()-1)){
+                ret = raycast(f1, f2, octree, false);
+            } else {
+                ret = raycast(f1, f2, octree); 
+            }
+            
             if(ret){
                 countTrue += 1;
             }

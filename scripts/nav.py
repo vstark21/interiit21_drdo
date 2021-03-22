@@ -94,6 +94,7 @@ class Controller:
         pose_stamped.header.stamp = self.timestamp
         pose_stamped.header.frame_id='map'
         pose_stamped.pose = pose
+        
 
         self.cmd_pos_pub.publish(pose_stamped)
 
@@ -297,7 +298,7 @@ if __name__ == "__main__":
     cont.connect()
     cont.takeoff(takeoff_height)
 
-    time.sleep(10)
+    #time.sleep(10)
     p1 = Pose()
     p1.position.x=1
     p1.position.y=1
@@ -321,7 +322,7 @@ if __name__ == "__main__":
     temp.header.stamp = rospy.Time.now()
     temp.setpoints = arr
 
-    cont.set_control.publish(temp)
+    #cont.set_control.publish(temp)
 
     input_thread = threading.Thread(target=take_inputs, args=(velocity, cont))
     input_thread.start()

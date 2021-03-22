@@ -53,9 +53,9 @@ pair< pair<double, double> , double> drone_crash(point3d current, pair< pair<dou
                 // && abs(f3.x()) < 100 && abs(f3.y()) < 100 && abs(f3.z()) < 100
                 if(ret){
                     cout << "DRONE CRASH\n";
-                    return drone_crash(current, 
-                                    {{setpoint.first.first - i*dronex, setpoint.first.second - j*droney}, setpoint.second - k*dronez}, 
-                                    octree, count_crash+1);
+                    /*return drone_crash(current, */
+                    return  {{setpoint.first.first - i*dronex, setpoint.first.second - j*droney}, setpoint.second - k*dronez} ; 
+                                    /*octree, count_crash+1);*/
                 }
             }
         }
@@ -66,8 +66,8 @@ pair< pair<double, double> , double> drone_crash(point3d current, pair< pair<dou
 pair<pair<double, double> , double> step(point3d current, pair<pair<double, double> , double> sp){
     pair<pair<double, double> , double> setpoint;
     setpoint.first.first = (current.x() + sp.first.first) / 2.0;
-    setpoint.first.second = (current.y() + sp.first.second) / 2.0
-    setpoint.second = (current.z() + sp.second) / 2.0
+    setpoint.first.second = (current.y() + sp.first.second) / 2.0;
+    setpoint.second = (current.z() + sp.second) / 2.0;
     return setpoint;
 }
 
@@ -128,13 +128,13 @@ int main(int argc, char **argv){
 
         vector<pair< pair<double, double> , double> > mp;
         for(auto i:m){
-            if(i.second <=2)mp.push_back(i.first);
+            if(i.second <=2 && !check_occupancy(point3d(i.first.first.first, i.first.first.second, i.first.second),ref_octree) )mp.push_back(i.first);
         }
 
 
         //print3d(Current);// 
         pair< pair<double, double> , double> x1 = Astar(ref_current, dest, mp, ref_octree);
-        x1 = step(current, x1);
+        x1 = step(ref_current, x1);
         pair< pair<double, double> , double> x = drone_crash(ref_current, x1, ref_octree, 0);
         
         //point3d new_orien(x.first.fir//st - Current.x(), 
@@ -152,9 +152,9 @@ int main(int argc, char **argv){
         p.position.x = x.first.first;
         p.position.y = x.first.second;
         p.position.z = x.second;
-        octomath::Vector3 tem = new_x - ref_current;
+        octomath::Vector3 tem = new_x -ref_current ;
         tf::Vector3 D = tf::Vector3(tem.x(),tem.y(),tem.z()).normalize();
-        tf::Vector3 S = D.cross(tf::Vector3(0,0,1));
+        tf::Vector3 S = tf::Vector3(0,0,1).cross(D);
         tf::Vector3 U = D.cross(S);
         /*tf::Matrix3x3 m_temp(D.x(),D.y(),D.z(),
                         S.x(),S.y(),S.z(),
@@ -171,6 +171,10 @@ int main(int argc, char **argv){
         p.orientation.y = q_y;
         p.orientation.z = q_z;
         p.orientation.w = q_w;
+        ROS_INFO("quat %f %f %f %f",q_x, q_y, q_z, q_w);
+        print3d(octomath::Vector3(D.x(),D.y(),D.z()));
+        print3d(octomath::Vector3(S.x(),S.y(),S.z()));
+        print3d(octomath::Vector3(U.x(),U.y(),U.z()));
         temp.setpoints.push_back(p);
         temp.header.stamp = ros::Time::now();
         temp.header.frame_id = "map";
