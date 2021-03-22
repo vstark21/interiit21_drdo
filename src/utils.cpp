@@ -14,7 +14,7 @@
 using namespace std;
 using namespace octomap;
 
-point3d bbx_size(10.0, 2.0, 10.0);
+point3d bbx_size(10.0, 10.0, 2.0);
 
 
 void getBoxesBoundingBox(
@@ -74,7 +74,7 @@ void insert(pair< pair<double, double> , double> p, map< pair< pair<double, doub
 
 void find_corners(point3d p, double d, map< pair< pair<double, double> , double>, int>& m){
     // d*=0.9;
-    double dronex = 0.47, droney = 0.23, dronez = 0.47;
+    double dronex = 0.47, droney = 0.47, dronez = 0.23;
     // for(int i=-1; i<=1; i+=2){
     //     for(int j=-1;j<=1;j+=2){
     //         for(int k=-1;k<=1;k+=2){
@@ -105,20 +105,21 @@ void find_corners(point3d p, double d, map< pair< pair<double, double> , double>
 
 void print3d(point3d f3){
     ROS_INFO("%f %f %f",f3.x(), f3.y(), f3.z());
+    // cout << f3.x() << " " << f3.y() << " " << f3.z() << endl;
 }
 
-bool raycast(point3d src, point3d dest, OcTree* octree){
+bool raycast(point3d src, point3d dest, OcTree* octree, bool ignoreUnknownCells=true){
     // Returns true if hit, else false
-    if(src.y() < 0.3)return true;
-    if(dest.y() < 0.3)return true;
-    if(src.y() > 4.7)return true;
-    if(dest.y() > 4.7)return true;
+    if(src.z() < 0.3)return true;
+    if(dest.z() < 0.3)return true;
+    if(src.z() > 4.7)return true;
+    if(dest.z() > 4.7)return true;
 
     if(src == dest)return false;
 
     point3d f3;
     OccupancyOcTreeBase<OcTreeNode>* octree_ = (OccupancyOcTreeBase<OcTreeNode>*) octree;
-    bool ret = octree_->castRay(src, dest-src, f3, false);
+    bool ret = octree_->castRay(src, dest-src, f3, ignoreUnknownCells);
     // double thresh=100.0;
     
     // if(!ret && abs(f3.x()) < thresh && abs(f3.y()) < thresh && abs(f3.z()) < thresh){
@@ -152,6 +153,7 @@ pair< pair<double, double> , double> generate_path(int qidx,
     // }
 
     ROS_INFO("PATH STARTED :");
+    // cout << "PATH STARTED :\n";
     
     while(current != start_idx){
         current = parent[current];
@@ -191,19 +193,19 @@ bool check_occupancy(point3d g, OcTree* octree){
 
 point3d decide(point3d current, point3d prev, point3d orien, OcTree* octree){
 
-    double length = +2.0;
+    double length = 2.0;
     point3d pull;
-    if(current.y() <= 3.0){
-        point3d pull_(0.0, 0.1*pow(3.0 - current.y(), 2), 0.0);
+    if(current.z() <= 3.0){
+        point3d pull_(0.0, 0.0, 0.1*pow(3.0 - current.z(), 2));
         pull = pull_;
     }
     else{
-        point3d pull_(0.0, -0.1 * pow(3.0 - current.y(), 2), 0.0);
+        point3d pull_(0.0, 0.0, -0.1*pow(3.0 - current.z(), 2));
         pull = pull_;
     }
-    prev = current;
-    point3d f1(orien.x(), orien.y(), orien.z());
-    point3d f2(prev.x() - current.x(), 0.0, prev.z() - current.z());
+    // prev = current;
+    point3d f1(orien.x(), orien.y(), 0.0);
+    point3d f2(prev.x() - current.x(), prev.y() - current.y(), 0.0);
 
     
     point3d orien_norm = f1.normalize();
@@ -223,14 +225,14 @@ point3d decide(point3d current, point3d prev, point3d orien, OcTree* octree){
     // point3d new_bbx(length, bbx_size.y(), length);
     // bbx_size = new_bbx;
     cout << length << endl;
-    if(new_dir.y() + current.y() >= 0.5 && new_dir.y() + current.y() <= 4.5){
+    if(new_dir.z() + current.z() >= 0.5 && new_dir.z() + current.z() <= 4.5){
         return new_dir + current;
     }
-    if(new_dir.y() + current.y() < 0.5){
-        point3d ans(new_dir.x() + current.x(), 0.5, new_dir.z() + current.z());
+    if(new_dir.z() + current.z() < 0.5){
+        point3d ans(new_dir.x() + current.x(), new_dir.y() + current.y(), 0.5);
         return ans;
     }
-    point3d ans(new_dir.x() + current.x(), 4.5, new_dir.z() + current.z());
+    point3d ans(new_dir.x() + current.x(), new_dir.y() + current.y(), 4.5);
 
     return ans;
 }
@@ -249,7 +251,7 @@ pair< pair<double, double> , double> Astar(point3d current, point3d dest, vector
     int numVertices = mp.size();
     vector<int> adj[numVertices];
     
-    if(!raycast(current, dest, octree)){
+    if(!raycast(current, dest, octree, false)){
         cout << "DIRECT PATH FOUND!\n";
         return target;
     }
@@ -271,7 +273,7 @@ pair< pair<double, double> , double> Astar(point3d current, point3d dest, vector
             point3d f1(mp[i].first.first, mp[i].first.second, mp[i].second);
             point3d f2(mp[j].first.first, mp[j].first.second, mp[j].second);
 
-            bool ret = raycast(f1, f2, octree);
+            bool ret = raycast(f1, f2, octree, false);
             if(ret){
                 countTrue += 1;
             }
@@ -294,6 +296,7 @@ pair< pair<double, double> , double> Astar(point3d current, point3d dest, vector
 
     cout << "Size of mp : " << mp.size() << endl;
     ROS_INFO("numEdges : %d",numEdges);
+    // cout << "numEdges : " << numEdges << endl;
 
     double g[numVertices];
     double h[numVertices];
@@ -348,7 +351,7 @@ pair< pair<double, double> , double> Astar(point3d current, point3d dest, vector
             if(g[q.second] + norm_elqs < g[el]){
                 parent[el] = q.second;
                 g[el] = g[q.second] + norm_elqs;
-                h[el] = l2_norm(target, mp[el]) + pow(mp[el].first.second - 3.0, 2);
+                h[el] = l2_norm(target, mp[el]) + pow(mp[el].second - 3.0, 2);
                 f[el] = g[el] + h[el];
                 openpq.push({f[el], el});
             }
@@ -356,6 +359,7 @@ pair< pair<double, double> , double> Astar(point3d current, point3d dest, vector
         }
     }
     ROS_ERROR("NO PATH FOUND");
+    // cout << "NO PATH FOUND\n";
     return start;
 }
 

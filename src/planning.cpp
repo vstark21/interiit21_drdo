@@ -13,8 +13,8 @@ octomap::AbstractOcTree* Tree;
 octomap::OcTree* Octree;
 bool map_empty = true;
 bool odom_empty = true;
-point3d Current(10.0, 1.0, 0.0);
-point3d Orien(-10.0, 0.0, 7.0); // sy 0 cy
+point3d Current(-3.11, 1.2, 2.99);
+point3d Orien(-0.5, 0.5, 0.0); // sy 0 cy
 
 void octomap_callback(const octomap_msgs::Octomap &msg)
 {
@@ -41,7 +41,7 @@ void odom_callback(const nav_msgs::Odometry &msg)
 }
 
 pair< pair<double, double> , double> drone_crash(point3d current, pair< pair<double, double> , double> setpoint, OcTree* octree, int count_crash){
-    double dronex = 0.4, droney = 0.2, dronez = 0.4;
+    double dronex = 0.4, droney = 0.4, dronez = 0.2;
     if(count_crash >= 6)return setpoint;
 
     for (int i=-1;i<=1;i+=2){
@@ -49,7 +49,7 @@ pair< pair<double, double> , double> drone_crash(point3d current, pair< pair<dou
             for (int k=-1;k<=1;k+=2){
                 point3d c(current.x() + i*dronex, current.y() + j*droney, current.z() + k*dronez);
                 point3d d(setpoint.first.first + i*dronex, setpoint.first.second + j*droney, setpoint.second + k*dronez);
-                bool ret = raycast(c, d, octree);
+                bool ret = raycast(c, d, octree, false);
                 // && abs(f3.x()) < 100 && abs(f3.y()) < 100 && abs(f3.z()) < 100
                 if(ret){
                     cout << "DRONE CRASH\n";
@@ -70,8 +70,9 @@ int main(int argc, char **argv){
     ros::Publisher setpoint_control = nh.advertise<interiit21_drdo::Setpoints>("/setpoint_array", 1000);
     ros::Subscriber octo_sub = nh.subscribe("/rtabmap/octomap_full", 1000, octomap_callback);
     ros::Subscriber odom_sub = nh.subscribe("/mavros/local_position/odom", 1000, odom_callback);
-    //tree = AbstractOcTree::read("/home/hexplex0xdd/octomap.ot");
-    //OcTree* octree = (OcTree*)tree;
+
+    // octomap::AbstractOcTree* tree = AbstractOcTree::read("/home/vishwas/Downloads/octomap_updated.ot");
+    // OcTree* Octree = (OcTree*)tree;
     
     // Need to read position and orientation of drone
     
@@ -89,6 +90,7 @@ int main(int argc, char **argv){
     octomap::OcTree* ref_octree = Octree;
     ROS_INFO("started");
     for(int check=0;ros::ok()&&(check<1);check++){
+    // for(int check=0;check<1;check++){
     
         ROS_INFO("IN FOR LOOP CURRENT:");
         print3d(ref_current);
