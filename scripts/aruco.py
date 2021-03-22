@@ -229,17 +229,17 @@ class Aruco_land():
 
     def Main(self, img, pos, yaw):
         if self.Landed:
-            return None, True
+            return None
 
         Centres, Flag = self.Aruco(img)
     
         if Flag:
             cx, cy = self.World_Pos(yaw, pos, Centres[0])
             if self.Distance([cx,cy], pos[:2]) < 0.6 and pos[2] > 2.6:
-                return [cx, cy, 2.0], False
+                return [cx, cy, 2.0]
             elif self.Distance([cx,cy], pos[:2]) < 0.35 and pos[2] > 1.6:
                 self.Landed = True
-                return [cx, cy, 0.23], True
+                return [cx, cy, 0.23]
         
         Unvisited = []
         for Centre in Centres:
@@ -262,7 +262,7 @@ class Aruco_land():
             if not self.Flag:
                 self.Initialize_Limits(yaw, pos)
 
-            return [cx, cy, 3.0], False
+            return [cx, cy, 3.0]
 
         Centres = self.White_Points(img)
     
@@ -285,13 +285,11 @@ class Aruco_land():
             if not self.Flag:
                 self.Initialize_Limits(yaw, pos)
 
-            return [cx, cy, 3.0], False
+            return [cx, cy, 3.0]
         
         if self.Flag:
-            return self.No_Point(pos), False
-        
-        return None, False
-
+            return self.No_Point(pos)
+       
 if __name__ == "__main__":
     #ar=Aruco_land()
     cont = Controller()
