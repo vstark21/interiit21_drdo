@@ -109,23 +109,25 @@ class Aruco_land():
         self.Flag = False
         self.Landed = False
         self.Visited_Aruco = []
-        self.Visited_Points = []
         self.aruco_dict = aruco.Dictionary_get(aruco.DICT_5X5_1000)
     
     def Initialize_Limits(self, yaw, pos):
         self.Flag = True
 
-        optimal_length = 5
-        Array = np.array(pos[:2]) - np.array(self.World_Pos(yaw, pos, [0, 240]))
-        index = np.argmax(abs(Array))
+        x1, y1 = self.World_Pos(yaw, pos, [0, 0])
+        x2, y2 = self.World_Pos(yaw, pos, [0, 480])
 
-        self.Left =  [index, pos[index] - (int(Array[index]/abs(Array[index])) * optimal_length)]
-        self.Right = [index, pos[index] + (int(Array[index]/abs(Array[index])) * optimal_length)]
+        m = (y2 - y1)/(x2 - x1)
+        C = y1 - m * x1
+        self.Left = [m,C]
         
-        Array = np.array(self.World_Pos(yaw, pos, [320, 0])) - np.array(pos[:2])
-        index = np.argmax(abs(Array))
+        x1, y1 = self.World_Pos(yaw, pos, [640, 0])
+        x2, y2 = self.World_Pos(yaw, pos, [640, 480])
 
-        self.Front = [index, int(Array[index]/abs(Array[index])) * optimal_length]
+        m = (y2 - y1)/(x2 - x1)
+        C = y1 - m * x1
+        self.Right = [m,C]
+
         self.last_move = 'L'
 
     def Aruco(self, img):
@@ -140,7 +142,7 @@ class Aruco_land():
             
             if ids[i][0] == 0:
                 return [[x,y]], True
-        
+
             Centres.append([x,y])
 
         return Centres, False
@@ -152,16 +154,17 @@ class Aruco_land():
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5,5))
         thresh = cv2.morphologyEx(thresh, cv2.MORPH_DILATE, kernel, iterations = 5)
 
-        contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+        # contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE) # For Windows
+        _, contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE) # For Linux
 
         Centres = []
         for contour in contours:
             if cv2.contourArea(contour) > 150:
                 M = cv2.moments(contour)
-                cx = int(M['m10']/M['m00'])
-                cy = int(M['m01']/M['m00'])
+                x = int(M['m10']/M['m00'])
+                y = int(M['m01']/M['m00'])
                     
-                Centres.append([cx,cy])
+                Centres.append([x,y])
         
         return Centres
 
@@ -202,30 +205,28 @@ class Aruco_land():
     
         return real_x, real_y
 
+    def Point_of_Intersection(self, Point, Line):
+        x = (Point[0] + (Line[0] * Point[1]) - (Line[0] * Line[1])) / math.sqrt((Line[0]**2) + 1)
+        y = (Line[0] * (Point[0] + (Line[0] * Point[1])) + Line[1]) / math.sqrt((Line[0]**2) + 1)
+        return x, y
+
     def No_Point(self, pos):
-        left_distance = abs(pos[self.Left[0]] - self.Left[1])
-        right_distance = abs(pos[self.Right[0]] - self.Right[1])
+        left_distance = self.Distance(pos, self.Point_of_Intersection(pos, self.Left))
+        right_distance = self.Distance(pos, self.Point_of_Intersection(pos, self.Right))
 
         if left_distance < 0.3 or right_distance < 0.3:
             if self.last_move == 'L':
                 self.last_move = 'R'
             elif self.last_move == 'R':
                 self.last_move = 'L'
-            
-            Point = pos[:2][:]
-            Point[self.Front[0]] += self.Front[1]
 
-            return [Point[0], Point[1], 3.0]
+            x, y = self.World_Pos(yaw, pos, [320, 0])
         elif self.last_move == 'L':
-            Point = pos[:2][:]
-            Point[self.Right[0]] = self.Right[1]
-
-            return [Point[0], Point[1], 3.0]
+            x, y = self.Point_of_Intersection(pos, self.Right)
         elif self.last_move == 'R':
-            Point = pos[:2][:]
-            Point[self.Left[0]] = self.Left[1]
-
-            return [Point[0], Point[1], 3.0]
+            x, y = self.Point_of_Intersection(pos, self.Left)
+        
+        return [x, y, 3.0]
 
     def Main(self, img, pos, yaw):
         if self.Landed:
@@ -234,12 +235,12 @@ class Aruco_land():
         Centres, Flag = self.Aruco(img)
     
         if Flag:
-            cx, cy = self.World_Pos(yaw, pos, Centres[0])
-            if self.Distance([cx,cy], pos[:2]) < 0.6 and pos[2] > 2.6:
-                return [cx, cy, 2.0]
-            elif self.Distance([cx,cy], pos[:2]) < 0.35 and pos[2] > 1.6:
+            x, y = self.World_Pos(yaw, pos, Centres[0])
+            if self.Distance([x,y], pos[:2]) < 0.6 and pos[2] > 2.6:
+                return [x, y, 2.0]
+            elif self.Distance([x,y], pos[:2]) < 0.35 and pos[2] > 1.6:
                 self.Landed = True
-                return [cx, cy, 0.23]
+                return [x, y, 0.23]
         
         Unvisited = []
         for Centre in Centres:
@@ -254,15 +255,14 @@ class Aruco_land():
         
         if len(Unvisited):
             Unvisited = sorted(Unvisited)
-            cx, cy = Unvisited[0][1]
-            self.Visited_Points.append([int(cx),int(cy)])
-            
+            x, y = Unvisited[0][1]
+ 
             if Unvisited[0][0] < 0.6:
-                self.Visited_Aruco.append([cx,cy])
+                self.Visited_Aruco.append([x,y])
             if not self.Flag:
                 self.Initialize_Limits(yaw, pos)
 
-            return [cx, cy, 3.0]
+            return [x, y, 3.0]
 
         Centres = self.White_Points(img)
     
@@ -279,13 +279,12 @@ class Aruco_land():
     
         if len(Unvisited):
             Unvisited = sorted(Unvisited)
-            cx, cy = Unvisited[0][1]
-            self.Visited_Points.append([int(cx),int(cy)])
+            x, y = Unvisited[0][1]
 
             if not self.Flag:
                 self.Initialize_Limits(yaw, pos)
 
-            return [cx, cy, 3.0]
+            return [x, y, 3.0]
         
         if self.Flag:
             return self.No_Point(pos)
