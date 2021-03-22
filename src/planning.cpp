@@ -143,6 +143,25 @@ int main(int argc, char **argv){
         p.position.x = x.first.first;
         p.position.y = x.first.second;
         p.position.z = x.second;
+        octomath::Vector3 tem = new_x - ref_current;
+        tf::Vector3 D = tf::Vector3(tem.x(),tem.y(),tem.z()).normalize();
+        tf::Vector3 S = D.cross(tf::Vector3(0,0,1));
+        tf::Vector3 U = D.cross(S);
+        /*tf::Matrix3x3 m_temp(D.x(),D.y(),D.z(),
+                        S.x(),S.y(),S.z(),
+                        U.x(),U.y(),U.z());
+        double t_r,t_p,t_y;
+        m_temp.getRPY(t_r, t_p, t_y);
+        tf::Quaternion q();*/
+        double q_w = sqrt(1.0 + D.x() + S.y() + U.z()) / 2.0;
+	    double q_w4 = (4.0 * q_w);
+	    double q_x = (U.y() - S.z()) / q_w4 ;
+	    double q_y = (D.z() - U.x()) / q_w4 ;
+	    double q_z = (S.x() - D.y()) / q_w4 ;
+        p.orientation.x = q_x;
+        p.orientation.y = q_y;
+        p.orientation.z = q_z;
+        p.orientation.w = q_w;
         temp.setpoints.push_back(p);
         temp.header.stamp = ros::Time::now();
         temp.header.frame_id = "map";
