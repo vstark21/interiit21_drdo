@@ -63,6 +63,14 @@ pair< pair<double, double> , double> drone_crash(point3d current, pair< pair<dou
     return setpoint;
 }
 
+pair<pair<double, double> , double> step(point3d current, pair<pair<double, double> , double> sp){
+    pair<pair<double, double> , double> setpoint;
+    setpoint.first.first = (current.x() + sp.first.first) / 2.0;
+    setpoint.first.second = (current.y() + sp.first.second) / 2.0
+    setpoint.second = (current.z() + sp.second) / 2.0
+    return setpoint;
+}
+
 int main(int argc, char **argv){
     ros::init(argc, argv, "planner_node");
     ros::NodeHandle nh;
@@ -126,6 +134,7 @@ int main(int argc, char **argv){
 
         //print3d(Current);// 
         pair< pair<double, double> , double> x1 = Astar(ref_current, dest, mp, ref_octree);
+        x1 = step(current, x1);
         pair< pair<double, double> , double> x = drone_crash(ref_current, x1, ref_octree, 0);
         
         //point3d new_orien(x.first.fir//st - Current.x(), 
