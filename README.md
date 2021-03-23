@@ -43,6 +43,7 @@ rm -r gimbal_small_2d
 To run different worlds, 
 
 ```sh
+roscd interiit21_drdo
 ./world1.sh # or ./world2.sh or ./world3.sh
 ```
 
