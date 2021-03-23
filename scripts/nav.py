@@ -91,7 +91,7 @@ class Controller:
     
     def goto(self, pose):
         pose_stamped = PoseStamped()
-        pose_stamped.header.stamp = self.timestamp
+        pose_stamped.header.stamp = rospy.Time.now()
         pose_stamped.header.frame_id='map'
         pose_stamped.pose = pose
         
@@ -293,11 +293,11 @@ if __name__ == "__main__":
 
     # Flight variables
     takeoff_height = 3
-    velocity = 0.6
+    velocity = 1
 
     cont.connect()
     cont.takeoff(takeoff_height)
-
+    
     #time.sleep(5)
     p1 = Pose()
     p1.position.x=1

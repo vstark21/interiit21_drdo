@@ -14,8 +14,23 @@
 using namespace std;
 using namespace octomap;
 
-point3d bbx_size(10.0, 10.0, 2.0);
+point3d bbx_size(6.0, 6.0, 3.5);
+point3d accum(0.0, 0.0, 0.0);
+queue<double> qu;
+int qusize=0;
+double total_err=0.0;
+double calc_error(point3d cur_orien,point3d prev_orien){
+	point3d cur_orien1(cur_orien.x(),cur_orien.y(),0.0);
+	point3d prev_orien1(prev_orien.x(),prev_orien.y(),0.0);
+	cur_orien1=cur_orien1.normalize();
+	prev_orien1 = prev_orien1.normalize();
+	double val=cur_orien.cross(prev_orien).z();
+	return asin(val);
+}
 
+point3d vec(double angle, double val){
+	return point3d(val*cos(angle),val*sin(angle),0.0);
+}
 
 void getBoxesBoundingBox(
     const point3d& position,
@@ -31,7 +46,7 @@ void getBoxesBoundingBox(
   }
   point3d max_boxes(2.0 * bounding_box_size.x() / octree_->getResolution(),
                             2.0 * bounding_box_size.y() / octree_->getResolution(),
-                            2.0 * bounding_box_size.z() / octree_->getResolution());
+                            5.0 / octree_->getResolution());
   long int max_vector_size = ceil(max_boxes.x()) *
                               ceil(max_boxes.y()) *
                               ceil(max_boxes.z());
@@ -40,9 +55,11 @@ void getBoxesBoundingBox(
   const double epsilon = 0.001;  // Small offset to not hit boundary of nodes.
   point3d epsilon_3d(epsilon, epsilon, epsilon);
 //   epsilon_3d.setConstant(epsilon);
-
-  point3d bbx_min = position - bounding_box_size + epsilon_3d;
-  point3d bbx_max = position + bounding_box_size - epsilon_3d;
+  point3d ext(0.0, bounding_box_size.y()-0.5,0.0);
+  point3d bbx_min = point3d(position.x()-bounding_box_size.x(),position.y()-0.5,-0.5)+epsilon_3d;
+  //point3d bbx_min = position.x() - bounding_box_size.x() + epsilon_3d;
+  point3d bbx_max = point3d(position.x()+bounding_box_size.x(),position.y()+bounding_box_size.y(),4.5) - epsilon_3d;
+  //point3d bbx_max = position + bounding_box_size - epsilon_3d;
 
 //   octomap::point3d bbx_min = pointEigenToOctomap(bbx_min_eigen);
 //   octomap::point3d bbx_max = pointEigenToOctomap(bbx_max_eigen);
@@ -82,12 +99,12 @@ void find_corners(point3d p, double d, map< pair< pair<double, double> , double>
     //         }
     //     }
     // }
-    double factor=2.0;
+    double factor=5;
     int cx, cy, cz;
     double fx, fy, fz;
-    for(int i=-1; i<=1; i+=1){
-        for(int j=-1;j<=1;j+=1){
-            for(int k=-1;k<=1;k+=1){
+    for(int i=-1; i<=1; i+=2){
+        for(int j=-1;j<=1;j+=2){
+            for(int k=-1;k<=1;k+=2){
                 if(i==0 && j==0 && k==0)continue;
                 cx = (p.x() + i*(d+dronex)/2)*factor;
                 fx = cx / factor;
@@ -107,6 +124,13 @@ void print3d(point3d f3){
     ROS_INFO("%f %f %f",f3.x(), f3.y(), f3.z());
     // cout << f3.x() << " " << f3.y() << " " << f3.z() << endl;
 }
+double l2_norm(point3d a, point3d b){
+    // No need of sqrt
+    return sqrt(pow(a.x()- b.x(), 2) + 
+                    pow(a.y() - b.y(), 2) +
+                    pow(a.z() - b.z(), 2));
+}
+
 
 bool raycast(point3d src, point3d dest, OcTree* octree, bool ignoreUnknownCells=true){
     // Returns true if hit, else false
@@ -119,7 +143,7 @@ bool raycast(point3d src, point3d dest, OcTree* octree, bool ignoreUnknownCells=
 
     point3d f3;
     OccupancyOcTreeBase<OcTreeNode>* octree_ = (OccupancyOcTreeBase<OcTreeNode>*) octree;
-    bool ret = octree_->castRay(src, dest-src, f3, ignoreUnknownCells);
+    bool ret = octree_->castRay(src, dest-src, f3, ignoreUnknownCells, l2_norm(src,dest)+0.3);
     // double thresh=100.0;
     
     // if(!ret && abs(f3.x()) < thresh && abs(f3.y()) < thresh && abs(f3.z()) < thresh){
@@ -177,8 +201,8 @@ point3d prec(point3d node){
     return prec_node;
 }
 
-bool check_occupancy(point3d g, OcTree* octree){
-    point3d size(0.5, 0.5, 0.5);
+bool check_occupancy(point3d g, OcTree* octree, double s){
+    point3d size(s, s, 0.2);
     point3d bbx_min = g - size;
     point3d bbx_max = g + size;
 
@@ -192,15 +216,17 @@ bool check_occupancy(point3d g, OcTree* octree){
 }
 
 point3d decide(point3d current, point3d prev, point3d orien, OcTree* octree){
-
-    double length = 3.0;
+    accum*=2.0;
+    accum = accum+ orien;
+    
+    double length = 5.0;
     point3d pull;
     if(current.z() <= 3.0){
-        point3d pull_(0.0, 0.0, 0.1*pow(3.0 - current.z(), 2));
+        point3d pull_(0.0, 0.0, 0.5*pow(3.0 - current.z(), 2));
         pull = pull_;
     }
     else{
-        point3d pull_(0.0, 0.0, -0.1*pow(3.0 - current.z(), 2));
+        point3d pull_(0.0, 0.0, -0.5*pow(3.0 - current.z(), 2));
         pull = pull_;
     }
     // prev = current;
@@ -211,14 +237,16 @@ point3d decide(point3d current, point3d prev, point3d orien, OcTree* octree){
     point3d orien_norm = f1.normalize();
 
     point3d prev_norm = f2.normalize();
+    prev_norm *= 5.0; //point3d(1.1*prev_norm.x(),
     
     // if(prev_norm.y() + orien_norm.y() )
-    point3d new_dir = prev_norm + orien_norm ; //+ pull;
+    point3d new_dir =  prev_norm + orien_norm + pull; // + accum.normalize();
+    //point3d new_dir = orien_norm + pull - vec(total_err,0.8); 
     point3d new_dir_norm = new_dir.normalize();
 
     new_dir = prec(new_dir_norm * length);
 
-    while(check_occupancy(new_dir + current, octree)){
+    while(check_occupancy(new_dir + current, octree, 0.5)){
         length += 0.5;
         new_dir = prec(new_dir_norm * length);
     }
@@ -226,13 +254,15 @@ point3d decide(point3d current, point3d prev, point3d orien, OcTree* octree){
     // bbx_size = new_bbx;
     cout << length << endl;
     if(new_dir.z() + current.z() >= 0.5 && new_dir.z() + current.z() <= 4.5){
-        return new_dir + current;
+        point3d ans(new_dir.x() + current.x(), new_dir.y() + current.y(), 3.0);
+        return ans;
+
     }
     if(new_dir.z() + current.z() < 0.5){
-        point3d ans(new_dir.x() + current.x(), new_dir.y() + current.y(), 0.5);
+        point3d ans(new_dir.x() + current.x(), new_dir.y() + current.y(), 3.0);
         return ans;
     }
-    point3d ans(new_dir.x() + current.x(), new_dir.y() + current.y(), 4.5);
+    point3d ans(new_dir.x() + current.x(), new_dir.y() + current.y(), 3.0);
 
     return ans;
 }
@@ -273,12 +303,8 @@ pair< pair<double, double> , double> Astar(point3d current, point3d dest, vector
             point3d f1(mp[i].first.first, mp[i].first.second, mp[i].second);
             point3d f2(mp[j].first.first, mp[j].first.second, mp[j].second);
             bool ret;
-            if(j==(mp.size()-1)){
-                ret = raycast(f1, f2, octree, false);
-            } else {
-                ret = raycast(f1, f2, octree); 
-            }
-            
+            ret = raycast(f1, f2, octree);
+           
             if(ret){
                 countTrue += 1;
             }
@@ -295,9 +321,28 @@ pair< pair<double, double> , double> Astar(point3d current, point3d dest, vector
             // cout << ret << endl;
         }
     }
-    // for(auto i:adj[numVertices - 1]){
-    //     cout << i << " ";
-    // }
+
+     for(int i=0;i<mp.size();i+=1){
+        if(!adj[i].empty()) continue;
+        for(int j=0;j<mp.size();j+=1){
+            if(i==j) continue;
+            if(i==(mp.size()-2) && j==(mp.size()-1)) continue;
+            if(j==mp.size()-2) continue;
+            point3d f1(mp[i].first.first, mp[i].first.second, mp[i].second);
+            point3d f2(mp[j].first.first, mp[j].first.second, mp[j].second);
+            bool ret;
+            ret = raycast(f1, f2, octree,false);
+           
+            if(ret){
+                countTrue += 1;
+            }
+            else {
+                numEdges+=1;
+                adj[i].push_back(j);
+                adj[j].push_back(i);
+            }
+        }
+    }
 
     cout << "Size of mp : " << mp.size() << endl;
     ROS_INFO("numEdges : %d",numEdges);
@@ -365,6 +410,6 @@ pair< pair<double, double> , double> Astar(point3d current, point3d dest, vector
     }
     ROS_ERROR("NO PATH FOUND");
     // cout << "NO PATH FOUND\n";
-    return start;
+    return target;
 }
 

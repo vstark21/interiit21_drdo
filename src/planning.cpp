@@ -40,22 +40,23 @@ void odom_callback(const nav_msgs::Odometry &msg)
     odom_empty = false;
 }
 
-pair< pair<double, double> , double> drone_crash(point3d current, pair< pair<double, double> , double> setpoint, OcTree* octree, int count_crash){
-    double dronex = 0.4, droney = 0.4, dronez = 0.2;
-    if(count_crash >= 6)return setpoint;
+pair< pair<double, double> , double> drone_crash(point3d current, pair< pair<double, double> , double> setpoint, OcTree* octree, int count_crash, double fac=0.2){
+    double fac_x=fac, fac_y=fac, fac_z=fac;
+    double dronex = 0.25, droney = 0.25, dronez = 0.1;
+    if(count_crash >= 12)return setpoint;
 
     for (int i=-1;i<=1;i+=2){
         for (int j=-1;j<=1;j+=2){
             for (int k=-1;k<=1;k+=2){
                 point3d c(current.x() + i*dronex, current.y() + j*droney, current.z() + k*dronez);
                 point3d d(setpoint.first.first + i*dronex, setpoint.first.second + j*droney, setpoint.second + k*dronez);
-                bool ret = raycast(c, d, octree, false);
+                bool ret = raycast(c, d, octree);
                 // && abs(f3.x()) < 100 && abs(f3.y()) < 100 && abs(f3.z()) < 100
                 if(ret){
-                    cout << "DRONE CRASH\n";
-                    /*return drone_crash(current, */
-                    return  {{setpoint.first.first - i*dronex, setpoint.first.second - j*droney}, setpoint.second - k*dronez} ; 
-                                    /*octree, count_crash+1);*/
+                    ROS_ERROR("DRONE CRASH\n");
+                    return drone_crash(current, 
+                        {{setpoint.first.first - i*fac_x, setpoint.first.second - j*fac_y}, setpoint.second - k*fac_z} , 
+                                    octree, count_crash+1, fac );
                 }
             }
         }
@@ -65,9 +66,9 @@ pair< pair<double, double> , double> drone_crash(point3d current, pair< pair<dou
 
 pair<pair<double, double> , double> step(point3d current, pair<pair<double, double> , double> sp){
     pair<pair<double, double> , double> setpoint;
-    setpoint.first.first = (current.x() + sp.first.first) / 2.0;
-    setpoint.first.second = (current.y() + sp.first.second) / 2.0;
-    setpoint.second = (current.z() + sp.second) / 2.0;
+    setpoint.first.first = (2*current.x() + sp.first.first) / 3.0;
+    setpoint.first.second = (2*current.y() + sp.first.second) / 3.0;
+    setpoint.second = (2*current.z() + sp.second) / 3.0;
     return setpoint;
 }
 
@@ -76,6 +77,7 @@ int main(int argc, char **argv){
     ros::NodeHandle nh;
     ROS_INFO("Setup");
     ros::Publisher setpoint_control = nh.advertise<interiit21_drdo::Setpoints>("/setpoint_array", 1000);
+    ros::Publisher dest_pub = nh.advertise<geometry_msgs::PoseStamped>("/dest_pose", 1000);
     ros::Subscriber octo_sub = nh.subscribe("/rtabmap/octomap_full", 1000, octomap_callback);
     ros::Subscriber odom_sub = nh.subscribe("/mavros/local_position/odom", 1000, odom_callback);
 
@@ -97,14 +99,22 @@ int main(int argc, char **argv){
     point3d prev = ref_current, ref_orien = Orien;
     octomap::OcTree* ref_octree = Octree;
     ROS_INFO("started");
-    for(int check=0;ros::ok()&&(check<1);check++){
+    for(int check=0;ros::ok()&&(check<30);check++){
     // for(int check=0;check<1;check++){
-    
+        
         ROS_INFO("IN FOR LOOP CURRENT:");
         print3d(ref_current);
         point3d dest = decide(ref_current, prev, ref_orien, ref_octree);
         ROS_INFO("DEST : ");
         print3d(dest);
+        geometry_msgs::PoseStamped dest_tmp;
+        dest_tmp.pose.position.x = dest.x();
+        dest_tmp.pose.position.y = dest.y();
+        dest_tmp.pose.position.z = dest.z();
+        dest_tmp.header.stamp = ros::Time::now();
+        dest_tmp.header.frame_id = "map";
+        dest_tmp.pose.orientation.w = 1;
+        dest_pub.publish(dest_tmp);
         // print3d(bbx_size);
         prev = dest;
         //print3d(Current);
@@ -115,8 +125,8 @@ int main(int argc, char **argv){
         ROS_INFO("Size of box_vector : %d",(int)box_vector.size());
 
         map<pair< pair<double, double> , double>, int> m;
-        for(int i=0;i<box_vector.size();i++){
-            find_corners(box_vector[i].first, box_vector[i].second, m);
+        for(int alp=0;alp<box_vector.size();alp++){
+            find_corners(box_vector[alp].first, box_vector[alp].second, m);
         } 
         ROS_INFO("Size of map : %d",(int)m.size() );
 
@@ -128,10 +138,11 @@ int main(int argc, char **argv){
 
         vector<pair< pair<double, double> , double> > mp;
         for(auto i:m){
-            if(i.second <=2 && !check_occupancy(point3d(i.first.first.first, i.first.first.second, i.first.second),ref_octree) )mp.push_back(i.first);
+            if(i.second<=2.0 && !check_occupancy(point3d(i.first.first.first, i.first.first.second, i.first.second),ref_octree, 0.3))mp.push_back(i.first);//   
         }
 
-
+        ROS_INFO("Size of mp : %d",(int)mp.size() );
+        //return 0;
         //print3d(Current);// 
         pair< pair<double, double> , double> x1 = Astar(ref_current, dest, mp, ref_octree);
         x1 = step(ref_current, x1);
@@ -152,7 +163,7 @@ int main(int argc, char **argv){
         p.position.x = x.first.first;
         p.position.y = x.first.second;
         p.position.z = x.second;
-        octomath::Vector3 tem = new_x -ref_current ;
+        octomath::Vector3 tem = new_x - ref_current ;
         tf::Vector3 D = tf::Vector3(tem.x(),tem.y(),tem.z()).normalize();
         tf::Vector3 S = tf::Vector3(0,0,1).cross(D);
         tf::Vector3 U = D.cross(S);
@@ -162,11 +173,12 @@ int main(int argc, char **argv){
         double t_r,t_p,t_y;
         m_temp.getRPY(t_r, t_p, t_y);
         tf::Quaternion q();*/
-        double q_w = sqrt(1.0 + D.x() + S.y() + U.z()) / 2.0;
+        double angle = atan2(tem.y(), tem.x());
+        double q_w = cos(angle/2);//sqrt(1.0 + D.x() + S.y() + U.z()) / 2.0;
 	    double q_w4 = (4.0 * q_w);
-	    double q_x = (U.y() - S.z()) / q_w4 ;
-	    double q_y = (D.z() - U.x()) / q_w4 ;
-	    double q_z = (S.x() - D.y()) / q_w4 ;
+	    double q_x = 0;//(U.y() - S.z()) / q_w4 ;
+	    double q_y = 0;//(D.z() - U.x()) / q_w4 ;
+	    double q_z = sin(angle/2);
         p.orientation.x = q_x;
         p.orientation.y = q_y;
         p.orientation.z = q_z;
@@ -182,13 +194,21 @@ int main(int argc, char **argv){
         //Current = new_x;
         odom_empty = true;
         ros::spinOnce();
-        while(ros::ok()&&odom_empty){
+        while(ros::ok()&&(odom_empty || l2_norm(x,{{Current.x(), Current.y()}, Current.z()})>0.3)){
             ros::spinOnce();
             loop_rate.sleep();
         }
-        ros::Duration(2.0).sleep();
-        ref_current = Current;
+        //ros::Duration(2.0).sleep();
+        double err_value = calc_error(Orien,ref_orien);
+        qu.push(err_value);
+        total_err+=err_value;
+        qusize++;
+        if(qusize>=10){
+	        total_err-=qu.front();
+	        qu.pop();
+        }
         ref_orien = Orien;
+        ref_current = Current;
         ref_octree = Octree;
     }
     
