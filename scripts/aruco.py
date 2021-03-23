@@ -98,35 +98,55 @@ class Controller:
             self.down_cam=image3
             if self.aruco is not None:
                 global y,pos
-                print(self.aruco.Main(self.down_cam,[ self.pose.position.x, self.pose.position.y, self.pose.position.z],y))
+                print(self.aruco.Main(y, [self.pose.position.x, self.pose.position.y, self.pose.position.z], self.down_cam))
             cv2.imshow("Downward_rgb", image3)
             cv2.waitKey(1)
         except Exception as e:
             rospy.loginfo(e)
 
-class Aruco_land():
+class Aruco_Land():
     def __init__(self):
         self.Flag = False
         self.Landed = False
         self.Visited_Aruco = []
         self.aruco_dict = aruco.Dictionary_get(aruco.DICT_5X5_1000)
     
+    def Absolute_Value(self, A):
+        return math.sqrt(A[0]**2 + A[1]**2)
+
+    def Perpendicular_Distance(self, Line, Point):
+        return abs(Line[0] * Point[0] + Line[1] * Point[1] + Line[2]) / self.Absolute_Value(Line[:2]) 
+
+    def Point_of_Intersection(self, Line, Point):
+        x = ((Line[1] * (Line[1] * Point[0] - Line[0] * Point[1])) - (Line[0] * Line[2])) / (Line[0]**2 + Line[1]**2)
+        y = ((Line[0] * (Line[0] * Point[1] - Line[1] * Point[0])) - (Line[1] * Line[2])) / (Line[0]**2 + Line[1]**2)
+        return x, y
+
     def Initialize_Limits(self, yaw, pos):
         self.Flag = True
 
-        x1, y1 = self.World_Pos(yaw, pos, [0, 0])
-        x2, y2 = self.World_Pos(yaw, pos, [0, 480])
+        x1, y1 = self.World_Pos(yaw, pos, [320, 0])
+        x2, y2 = self.World_Pos(yaw, pos, [320, 480])
 
-        m = (y2 - y1)/(x2 - x1)
-        C = y1 - m * x1
-        self.Left = [m,C]
+        self.Front_Distance = self.Euclidean_Distance([x1,y1],[x2,y2])
+
+        a = y2 - y1
+        b = x1 - x2
+        c = x2 * y1 - y2 * x1
         
-        x1, y1 = self.World_Pos(yaw, pos, [640, 0])
-        x2, y2 = self.World_Pos(yaw, pos, [640, 480])
+        x1, y1 = self.World_Pos(yaw, pos, [0, 240])
+        x2, y2 = self.World_Pos(yaw, pos, [640, 240])
 
-        m = (y2 - y1)/(x2 - x1)
-        C = y1 - m * x1
-        self.Right = [m,C]
+        d = self.Euclidean_Distance([x1,y1],[x2,y2])
+        c1 = c + d * self.Absolute_Value([a,b]) 
+        c2 = c - d * self.Absolute_Value([a,b])
+
+        if self.Perpendicular_Distance([a,b,c1],[x1,y1]) < self.Perpendicular_Distance([a,b,c2],[x1,y1]):
+            self.Left = [a,b,c1]
+            self.Right = [a,b,c2]
+        else:
+            self.Left = [a,b,c2]
+            self.Right = [a,b,c1]
 
         self.last_move = 'L'
 
@@ -154,8 +174,8 @@ class Aruco_land():
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5,5))
         thresh = cv2.morphologyEx(thresh, cv2.MORPH_DILATE, kernel, iterations = 5)
 
-        # contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE) # For Windows
-        _, contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE) # For Linux
+        contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE) # For Windows
+        #_, contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE) # For Linux
 
         Centres = []
         for contour in contours:
@@ -168,14 +188,14 @@ class Aruco_land():
         
         return Centres
 
-    def Distance(self, A, B):
+    def Euclidean_Distance(self, A, B):
         return math.sqrt(((B[0] - A[0])**2) + ((B[1] - A[1])**2))
 
     def World_Pos(self, yaw, pos, centre):
         del_x = centre[0] - 320
         del_y = 240 - centre[1]
     
-        Length = self.Distance(centre, (320, 240))
+        Length = self.Euclidean_Distance(centre, (320, 240))
 
         img_angle1 = math.acos(del_y / Length)
         img_angle2 = math.asin(del_x / Length)
@@ -205,14 +225,9 @@ class Aruco_land():
     
         return real_x, real_y
 
-    def Point_of_Intersection(self, Point, Line):
-        x = (Point[0] + (Line[0] * Point[1]) - (Line[0] * Line[1])) / math.sqrt((Line[0]**2) + 1)
-        y = (Line[0] * (Point[0] + (Line[0] * Point[1])) + Line[1]) / math.sqrt((Line[0]**2) + 1)
-        return x, y
-
-    def No_Point(self, pos):
-        left_distance = self.Distance(pos, self.Point_of_Intersection(pos, self.Left))
-        right_distance = self.Distance(pos, self.Point_of_Intersection(pos, self.Right))
+    def No_Point(self, yaw, pos):
+        left_distance = self.Perpendicular_Distance(self.Left, pos)
+        right_distance = self.Perpendicular_Distance(self.Right, pos)
 
         if left_distance < 0.3 or right_distance < 0.3:
             if self.last_move == 'L':
@@ -220,15 +235,31 @@ class Aruco_land():
             elif self.last_move == 'R':
                 self.last_move = 'L'
 
+            x1, y1 = self.World_Pos(yaw, pos, [0, 240])
+            x2, y2 = self.World_Pos(yaw, pos, [640, 240])
+
+            a = y2 - y1
+            b = x1 - x2
+            c = x2 * y1 - y2 * x1
+
+            c1 = c + self.Front_Distance * self.Absolute_Value([a,b]) 
+            c2 = c - self.Front_Distance  * self.Absolute_Value([a,b])
+
             x, y = self.World_Pos(yaw, pos, [320, 0])
+
+            if self.Perpendicular_Distance([a,b,c1],[x,y]) < self.Perpendicular_Distance([a,b,c2],[x,y]):
+                x, y = self.Point_of_Intersection([a,b,c1], pos)
+            else:
+                x, y = self.Point_of_Intersection([a,b,c2], pos)
+
         elif self.last_move == 'L':
-            x, y = self.Point_of_Intersection(pos, self.Right)
+            x, y = self.Point_of_Intersection(self.Right, pos)
         elif self.last_move == 'R':
-            x, y = self.Point_of_Intersection(pos, self.Left)
+            x, y = self.Point_of_Intersection(self.Left, pos)
         
         return [x, y, 3.0]
 
-    def Main(self, img, pos, yaw):
+    def Main(self, yaw, pos, img):
         if self.Landed:
             return None
 
@@ -236,22 +267,22 @@ class Aruco_land():
     
         if Flag:
             x, y = self.World_Pos(yaw, pos, Centres[0])
-            if self.Distance([x,y], pos[:2]) < 0.6 and pos[2] > 2.6:
+            if self.Euclidean_Distance([x,y], pos[:2]) < 0.6 and pos[2] > 2.6:
                 return [x, y, 2.0]
-            elif self.Distance([x,y], pos[:2]) < 0.35 and pos[2] > 1.6:
+            elif self.Euclidean_Distance([x,y], pos[:2]) < 0.35 and pos[2] > 1.6:
                 self.Landed = True
-                return [x, y, 0.23]
+                return [x, y, 0.15]
         
         Unvisited = []
         for Centre in Centres:
             world_pos = self.World_Pos(yaw, pos, Centre)
             Flag = False
             for P in self.Visited_Aruco:
-                if self.Distance(P, world_pos) < 0.6:
+                if self.Euclidean_Distance(P, world_pos) < 0.6:
                     Flag = True
                     break
             if not Flag:
-                Unvisited.append([self.Distance(pos, world_pos), world_pos])
+                Unvisited.append([self.Euclidean_Distance(pos, world_pos), world_pos])
         
         if len(Unvisited):
             Unvisited = sorted(Unvisited)
@@ -271,11 +302,11 @@ class Aruco_land():
             world_pos = self.World_Pos(yaw, pos, Centre)
             Flag = False
             for P in self.Visited_Aruco:
-                if self.Distance(P, world_pos) < 1.1:
+                if self.Euclidean_Distance(P, world_pos) < 1.1:
                     Flag = True
                     break
             if not Flag:
-                Unvisited.append([self.Distance(pos, world_pos), world_pos])
+                Unvisited.append([self.Euclidean_Distance(pos, world_pos), world_pos])
     
         if len(Unvisited):
             Unvisited = sorted(Unvisited)
@@ -287,15 +318,14 @@ class Aruco_land():
             return [x, y, 3.0]
         
         if self.Flag:
-            return self.No_Point(pos)
+            return self.No_Point(yaw, pos)
        
 if __name__ == "__main__":
-    #ar=Aruco_land()
     cont = Controller()
     while(pos==None):
         continue
-
-    ar=Aruco_land()
+        
+    ar = Aruco_Land()
     cont.aruco = ar
     # Flight variables
     takeoff_height = 3
