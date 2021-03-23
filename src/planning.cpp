@@ -40,10 +40,10 @@ void odom_callback(const nav_msgs::Odometry &msg)
     odom_empty = false;
 }
 
-pair< pair<double, double> , double> drone_crash(point3d current, pair< pair<double, double> , double> setpoint, OcTree* octree, int count_crash, double fac=0.2){
+pair< pair<double, double> , double> drone_crash(point3d current, pair< pair<double, double> , double> setpoint, OcTree* octree, int count_crash, double fac=0.1){
     double fac_x=fac, fac_y=fac, fac_z=fac;
-    double dronex = 0.25, droney = 0.25, dronez = 0.1;
-    if(count_crash >= 12)return setpoint;
+    double dronex = 0.25, droney = 0.25, dronez = 0.15;
+    if(count_crash >= 15)return setpoint;
 
     for (int i=-1;i<=1;i+=2){
         for (int j=-1;j<=1;j+=2){
@@ -138,7 +138,7 @@ int main(int argc, char **argv){
 
         vector<pair< pair<double, double> , double> > mp;
         for(auto i:m){
-            if(i.second<=2.0 && !check_occupancy(point3d(i.first.first.first, i.first.first.second, i.first.second),ref_octree, 0.3))mp.push_back(i.first);//   
+            if(i.second<=3.0 && !check_occupancy(point3d(i.first.first.first, i.first.first.second, i.first.second),ref_octree, 0.3))mp.push_back(i.first);//   
         }
 
         ROS_INFO("Size of mp : %d",(int)mp.size() );
