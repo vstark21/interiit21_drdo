@@ -128,7 +128,9 @@ class Aruco_Land():
         x1, y1 = self.World_Pos(yaw, pos, [320, 0])
         x2, y2 = self.World_Pos(yaw, pos, [320, 480])
 
-        self.Front_Distance = self.Euclidean_Distance([x1,y1],[x2,y2])
+        self.Front = [0,0,0]
+        self.Current_Front_Distance = 0
+        self.Switch = True
 
         a = y2 - y1
         b = x1 - x2
@@ -137,9 +139,8 @@ class Aruco_Land():
         x1, y1 = self.World_Pos(yaw, pos, [0, 240])
         x2, y2 = self.World_Pos(yaw, pos, [640, 240])
 
-        d = self.Euclidean_Distance([x1,y1],[x2,y2])
-        c1 = c + d * self.Absolute_Value([a,b]) 
-        c2 = c - d * self.Absolute_Value([a,b])
+        c1 = c + 3.0 * self.Absolute_Value([a,b]) 
+        c2 = c - 3.0 * self.Absolute_Value([a,b])
 
         if self.Perpendicular_Distance([a,b,c1],[x1,y1]) < self.Perpendicular_Distance([a,b,c2],[x1,y1]):
             self.Left = [a,b,c1]
@@ -229,33 +230,41 @@ class Aruco_Land():
         left_distance = self.Perpendicular_Distance(self.Left, pos)
         right_distance = self.Perpendicular_Distance(self.Right, pos)
 
-        if left_distance < 0.3 or right_distance < 0.3:
-            if self.last_move == 'L':
-                self.last_move = 'R'
-            elif self.last_move == 'R':
-                self.last_move = 'L'
+        if (self.last_move == 'R' and left_distance < 0.3) or (self.last_move == 'L' and right_distance < 0.3) or self.Current_Front_Distance > 0.3:
+            if self.Switch:
+                if self.last_move == 'L':
+                    self.last_move = 'R'
+                elif self.last_move == 'R':
+                    self.last_move = 'L'
 
-            x1, y1 = self.World_Pos(yaw, pos, [0, 240])
-            x2, y2 = self.World_Pos(yaw, pos, [640, 240])
+                x1, y1 = self.World_Pos(yaw, pos, [0, 240])
+                x2, y2 = self.World_Pos(yaw, pos, [640, 240])
 
-            a = y2 - y1
-            b = x1 - x2
-            c = x2 * y1 - y2 * x1
+                a = y2 - y1
+                b = x1 - x2
+                c = x2 * y1 - y2 * x1
 
-            c1 = c + self.Front_Distance * self.Absolute_Value([a,b]) 
-            c2 = c - self.Front_Distance  * self.Absolute_Value([a,b])
+                c1 = c + 2.3 * self.Absolute_Value([a,b]) 
+                c2 = c - 2.3 * self.Absolute_Value([a,b])
 
-            x, y = self.World_Pos(yaw, pos, [320, 0])
+                x, y = self.World_Pos(yaw, pos, [320, 0])
 
-            if self.Perpendicular_Distance([a,b,c1],[x,y]) < self.Perpendicular_Distance([a,b,c2],[x,y]):
-                x, y = self.Point_of_Intersection([a,b,c1], pos)
-            else:
-                x, y = self.Point_of_Intersection([a,b,c2], pos)
+                if self.Perpendicular_Distance([a,b,c1],[x,y]) < self.Perpendicular_Distance([a,b,c2],[x,y]):
+                    self.Front = [a,b,c1]   
+                else:
+                    self.Front = [a,b,c2]
+                
+                self.Switch = False
+
+            x, y = self.Point_of_Intersection(self.Front, pos)
+            self.Current_Front_Distance = self.Perpendicular_Distance(self.Front, pos)    
 
         elif self.last_move == 'L':
             x, y = self.Point_of_Intersection(self.Right, pos)
+            self.Switch = True
         elif self.last_move == 'R':
             x, y = self.Point_of_Intersection(self.Left, pos)
+            self.Switch = True
         
         return [x, y, 3.0]
 
@@ -267,18 +276,18 @@ class Aruco_Land():
     
         if Flag:
             x, y = self.World_Pos(yaw, pos, Centres[0])
-            if self.Euclidean_Distance([x,y], pos[:2]) < 0.6 and pos[2] > 2.6:
+            if self.Euclidean_Distance([x,y], pos) < 0.55 and pos[2] > 2.6:
                 return [x, y, 2.0]
-            elif self.Euclidean_Distance([x,y], pos[:2]) < 0.35 and pos[2] > 1.6:
+            elif self.Euclidean_Distance([x,y], pos) < 0.3 and pos[2] > 1.6:
                 self.Landed = True
-                return [x, y, 0.15]
+                return [x, y, 0.1]
         
         Unvisited = []
         for Centre in Centres:
             world_pos = self.World_Pos(yaw, pos, Centre)
             Flag = False
             for P in self.Visited_Aruco:
-                if self.Euclidean_Distance(P, world_pos) < 0.6:
+                if self.Euclidean_Distance(P, world_pos) < 2.2:
                     Flag = True
                     break
             if not Flag:
@@ -302,7 +311,7 @@ class Aruco_Land():
             world_pos = self.World_Pos(yaw, pos, Centre)
             Flag = False
             for P in self.Visited_Aruco:
-                if self.Euclidean_Distance(P, world_pos) < 1.1:
+                if self.Euclidean_Distance(P, world_pos) < 2.5:
                     Flag = True
                     break
             if not Flag:
