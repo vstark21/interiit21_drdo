@@ -199,14 +199,7 @@ int main(int argc, char **argv){
             loop_rate.sleep();
         }
         //ros::Duration(2.0).sleep();
-        double err_value = calc_error(Orien,ref_orien);
-        qu.push(err_value);
-        total_err+=err_value;
-        qusize++;
-        if(qusize>=10){
-	        total_err-=qu.front();
-	        qu.pop();
-        }
+        
         ref_orien = Orien;
         ref_current = Current;
         ref_octree = Octree;

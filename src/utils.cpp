@@ -210,7 +210,7 @@ point3d decide(point3d current, point3d prev, point3d orien, OcTree* octree){
     point3d orien_norm = f1.normalize();
 
     point3d prev_norm = f2.normalize();
-    prev_norm *= 5.0; //point3d(1.1*prev_norm.x(),
+    prev_norm *= 2.0; //point3d(1.1*prev_norm.x(),
     
     // if(prev_norm.y() + orien_norm.y() )
     point3d new_dir =  prev_norm + orien_norm + pull; // + accum.normalize();
@@ -235,9 +235,9 @@ point3d decide(point3d current, point3d prev, point3d orien, OcTree* octree){
     if(new_dir.z() + current.z() < 0.5){
         point3d ans(new_dir.x() + current.x(), new_dir.y() + current.y(), 3.0);
         return ans;
-    }
+    }*/
     point3d ans(new_dir.x() + current.x(), new_dir.y() + current.y(), 3.0);
-    */
+    
     return ans;
 }
 
