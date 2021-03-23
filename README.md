@@ -26,11 +26,11 @@ cd ~/catkin_ws
 catkin build
 ```
 
-And make all the files in scripts directory executable (replace <filename> with different filenames)
+And make all the files in scripts directory executable (replace `filename` with different filenames)
 
 ```sh
 cd ~/catkin_ws/src/interiit21_drdo/scripts
-sudo chmod +x <filename>.py 
+sudo chmod +x filename.py 
 ```
 
 Now remove `gimbal_small_2d/` directory
