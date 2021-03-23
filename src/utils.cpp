@@ -56,7 +56,7 @@ void getBoxesBoundingBox(
   point3d epsilon_3d(epsilon, epsilon, epsilon);
 //   epsilon_3d.setConstant(epsilon);
   point3d ext(0.0, bounding_box_size.y()-0.5,0.0);
-  point3d bbx_min = point3d(position.x()-bounding_box_size.x(),position.y()-0.5,-0.5)+epsilon_3d;
+  point3d bbx_min = point3d(position.x()-bounding_box_size.x(),position.y()-bounding_box_size.y(),-0.5)+epsilon_3d;
   //point3d bbx_min = position.x() - bounding_box_size.x() + epsilon_3d;
   point3d bbx_max = point3d(position.x()+bounding_box_size.x(),position.y()+bounding_box_size.y(),4.5) - epsilon_3d;
   //point3d bbx_max = position + bounding_box_size - epsilon_3d;
@@ -401,7 +401,7 @@ pair< pair<double, double> , double> Astar(point3d current, point3d dest, vector
             if(g[q.second] + norm_elqs < g[el]){
                 parent[el] = q.second;
                 g[el] = g[q.second] + norm_elqs;
-                h[el] = l2_norm(target, mp[el]) + pow(mp[el].second - 3.0, 2);
+                h[el] = l2_norm(target, mp[el]) + 5.0*pow(mp[el].second - 3.0, 2);
                 f[el] = g[el] + h[el];
                 openpq.push({f[el], el});
             }
