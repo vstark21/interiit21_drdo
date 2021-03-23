@@ -14,7 +14,8 @@
 using namespace std;
 using namespace octomap;
 
-point3d bbx_size(6.0, 6.0, 3.5);
+point3d bbx_size(6.0, 10.0, 3.5);
+point3d bbx_size1(6.0, 2.0, 3.5);
 
 void getBoxesBoundingBox(
     const point3d& position,
@@ -39,7 +40,7 @@ void getBoxesBoundingBox(
   const double epsilon = 0.001;  // Small offset to not hit boundary of nodes.
   point3d epsilon_3d(epsilon, epsilon, epsilon);
 //   epsilon_3d.setConstant(epsilon);
-  point3d bbx_min = point3d(position.x()-bounding_box_size.x(),position.y()-bounding_box_size.y(),0.0)+epsilon_3d;
+  point3d bbx_min = point3d(position.x()-bbx_size1.x(),position.y()-bbx_size1.y(),0.0)+epsilon_3d;
   //point3d bbx_min = position.x() - bounding_box_size.x() + epsilon_3d;
   point3d bbx_max = point3d(position.x()+bounding_box_size.x(),position.y()+bounding_box_size.y(),4.0) - epsilon_3d;
   //point3d bbx_max = position + bounding_box_size - epsilon_3d;
@@ -192,7 +193,7 @@ bool check_occupancy(point3d g, OcTree* octree, double s){
 
 point3d decide(point3d current, point3d prev, point3d orien, OcTree* octree){
     
-    double length = 5.0;
+    double length = 4.0;
     point3d pull;
     if(current.z() <= 3.0){
         point3d pull_(0.0, 0.0, 0.5*pow(3.0 - current.z(), 2));
@@ -375,7 +376,7 @@ pair< pair<double, double> , double> Astar(point3d current, point3d dest, vector
             if(g[q.second] + norm_elqs < g[el]){
                 parent[el] = q.second;
                 g[el] = g[q.second] + norm_elqs;
-                h[el] = l2_norm(target, mp[el]) + 100.0*pow(mp[el].second - 3.0, 2);
+                h[el] = l2_norm(target, mp[el]) + 100.0*pow(mp[el].second - 3.0, 2)  + (mp[start_idx].first.second-mp[el].first.second)*4.0 ;//+ (mp[el].first.first-mp[start_idx].first.first)*0.5;
                 f[el] = g[el] + h[el];
                 openpq.push({f[el], el});
             }
