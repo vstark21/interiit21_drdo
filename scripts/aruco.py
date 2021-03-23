@@ -139,8 +139,8 @@ class Aruco_Land():
         x1, y1 = self.World_Pos(yaw, pos, [0, 240])
         x2, y2 = self.World_Pos(yaw, pos, [640, 240])
 
-        c1 = c + 3.0 * self.Absolute_Value([a,b]) 
-        c2 = c - 3.0 * self.Absolute_Value([a,b])
+        c1 = c + 1.5 * self.Absolute_Value([a,b]) 
+        c2 = c - 1.5 * self.Absolute_Value([a,b])
 
         if self.Perpendicular_Distance([a,b,c1],[x1,y1]) < self.Perpendicular_Distance([a,b,c2],[x1,y1]):
             self.Left = [a,b,c1]
@@ -244,8 +244,8 @@ class Aruco_Land():
                 b = x1 - x2
                 c = x2 * y1 - y2 * x1
 
-                c1 = c + 2.3 * self.Absolute_Value([a,b]) 
-                c2 = c - 2.3 * self.Absolute_Value([a,b])
+                c1 = c + 2.6 * self.Absolute_Value([a,b]) 
+                c2 = c - 2.6 * self.Absolute_Value([a,b])
 
                 x, y = self.World_Pos(yaw, pos, [320, 0])
 
@@ -280,7 +280,7 @@ class Aruco_Land():
                 return [x, y, 2.0]
             elif self.Euclidean_Distance([x,y], pos) < 0.3 and pos[2] > 1.6:
                 self.Landed = True
-                return [x, y, 0.1]
+                return [x, y, 0.05]
         
         Unvisited = []
         for Centre in Centres:
@@ -302,7 +302,7 @@ class Aruco_Land():
             if not self.Flag:
                 self.Initialize_Limits(yaw, pos)
 
-            return [x, y, 3.0]
+            return [x, y, 2.0]
 
         Centres = self.White_Points(img)
     
@@ -324,7 +324,7 @@ class Aruco_Land():
             if not self.Flag:
                 self.Initialize_Limits(yaw, pos)
 
-            return [x, y, 3.0]
+            return [x, y, 2.0]
         
         if self.Flag:
             return self.No_Point(yaw, pos)
