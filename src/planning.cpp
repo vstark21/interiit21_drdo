@@ -140,7 +140,7 @@ int main(int argc, char **argv){
 
         vector<pair< pair<double, double> , double> > mp;
         for(auto i:m){
-            if(i.second<=8.0 && !check_occupancy(point3d(i.first.first.first, i.first.first.second, i.first.second),ref_octree, 0.5))mp.push_back(i.first);//   
+            if(i.second<=8.0 && !check_occupancy(point3d(i.first.first.first, i.first.first.second, i.first.second),ref_octree, 0.3))mp.push_back(i.first);//   
         }
 
         ROS_INFO("Size of mp : %d",(int)mp.size() );

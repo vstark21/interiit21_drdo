@@ -218,10 +218,10 @@ point3d decide(point3d current, point3d prev, point3d orien, OcTree* octree){
     point3d orien_norm = f1.normalize();
     if(l2_norm(f2)>0.5){
         prev_norm = f2.normalize();
-        prev_norm *= 4.0; //point3d(1.1*prev_norm.x(),
+        prev_norm *= 7.0; //point3d(1.1*prev_norm.x(),
     }
     // if(prev_norm.y() + orien_norm.y() )
-    point3d new_dir =  prev_norm + orien_norm  + point3d(-1,0,0); // + accum.normalize();
+    point3d new_dir =  prev_norm + orien_norm; //  + point3d(-1,0,0); // + accum.normalize();
     //point3d new_dir = orien_norm + pull - vec(total_err,0.8); 
     point3d new_dir_norm = new_dir.normalize();
 
@@ -385,7 +385,7 @@ pair< pair<double, double> , double> Astar(point3d current, point3d dest, vector
                 parent[el] = q.second;
                 g[el] = g[q.second] + norm_elqs;
                 point3d var(mp[start_idx].first.first-mp[el].first.first,mp[start_idx].first.second-mp[el].first.second,mp[start_idx].second-mp[el].second);
-                h[el] = l2_norm(target, mp[el]) + 10.0*pow(mp[el].second - 3.0, 2)  + (mp[start_idx].first.second-mp[el].first.second)*0.0 + (mp[el].first.first-mp[start_idx].first.first)*10.0;
+                h[el] = l2_norm(target, mp[el]) + 15.0*pow(mp[el].second - 3.0, 2)  + (mp[start_idx].first.second-mp[el].first.second)*2.0; // + (mp[el].first.first-mp[start_idx].first.first)*2.0;
                 /*note change y back to 1.0*/
                 f[el] = g[el] + h[el];
                 //-20.0*calc_ang(var,orien)
