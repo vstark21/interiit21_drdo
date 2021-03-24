@@ -16,6 +16,7 @@ bool odom_empty = true;
 point3d Current(-3.11, 1.2, 2.99);
 point3d Orien(-0.5, 0.5, 0.0); // sy 0 cy
 
+/* Callback function to recieve octomap generated and published by rtabmap.*/
 void octomap_callback(const octomap_msgs::Octomap &msg)
 {
     Tree = octomap_msgs::fullMsgToMap(msg);
@@ -24,6 +25,7 @@ void octomap_callback(const octomap_msgs::Octomap &msg)
     ROS_INFO("Yeah!");
 }
 
+/* Callback function to recieve odometry data published by mavros.*/
 void odom_callback(const nav_msgs::Odometry &msg)
 {
     ROS_INFO("ODOM");
@@ -40,6 +42,7 @@ void odom_callback(const nav_msgs::Odometry &msg)
     odom_empty = false;
 }
 
+/* Returns a point around given setpoint which is safe for the quadcopter to navigate from current to that point. */
 pair< pair<double, double> , double> drone_crash(point3d current, pair< pair<double, double> , double> setpoint, OcTree* octree, int count_crash, double fac=0.1){
     double fac_x=fac, fac_y=fac, fac_z=fac;
     double dronex = 0.35, droney = 0.35, dronez = 0.25;
@@ -64,6 +67,7 @@ pair< pair<double, double> , double> drone_crash(point3d current, pair< pair<dou
     return setpoint;
 }
 
+/* Takes in current position(current) and next setpoint(sp) and returns a point between current and sp. */
 pair<pair<double, double> , double> step(point3d current, pair<pair<double, double> , double> sp){
     point3d te(sp.first.first, sp.first.second, sp.second);
     double val = l2_norm(te,current);
