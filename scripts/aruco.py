@@ -57,6 +57,7 @@ class Controller:
 
     def pos_callback(self, data):
         self.timestamp = data.header.stamp
+        print data.header.frame_id
         self.pose = data.pose
         global pos
               
@@ -89,8 +90,6 @@ class Controller:
 
     def downcam_callback(self, data):
        
-        def downcam_callback(self, data):
-       
         bridge = CvBridge()
         image3 = bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')[:, :, ::-1]
         
@@ -104,9 +103,32 @@ class Controller:
             if pos != None:
                 x, y, z = pos
                 self.goto_xyz_rpy(x, y, z, 0, 0, pi_2)
-        #cv2.imshow("Downward_rgb", image3)
-        #cv2.waitKey(1)
 
+            #cv2.imshow("Downward_rgb", image3)
+            #cv2.waitKey(1)
+
+    def goto(self, pose):
+        pose_stamped = PoseStamped()
+        pose_stamped.header.stamp = rospy.Time.now()
+        pose_stamped.header.frame_id='map'
+        pose_stamped.pose = pose
+        
+
+        self.cmd_pos_pub.publish(pose_stamped)
+
+    def goto_xyz_rpy(self, x, y, z, ro, pi, ya):
+        pose = Pose()
+        pose.position.x = x
+        pose.position.y = y
+        pose.position.z = z
+
+        quats = tf.transformations.quaternion_from_euler(ro, pi, ya + pi_2)
+
+        pose.orientation.x = quats[0]
+        pose.orientation.y = quats[1]
+        pose.orientation.z = quats[2]
+        pose.orientation.w = quats[3]
+        self.goto(pose)
 
 class Aruco_Land():
     # Constructor
@@ -205,8 +227,8 @@ class Aruco_Land():
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5,5))
         thresh = cv2.morphologyEx(thresh, cv2.MORPH_DILATE, kernel, iterations = 5)
 
-        # contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE) # For Windows
-        _, contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE) # For Linux
+        contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE) # For Windows
+        # _, contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE) # For Linux
 
         Centres = []
         for contour in contours:
