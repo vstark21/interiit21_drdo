@@ -99,8 +99,8 @@ class Controller:
             if self.aruco is not None:
                 global y,pos
                 print(self.aruco.Main(y, [self.pose.position.x, self.pose.position.y, self.pose.position.z], self.down_cam))
-            cv2.imshow("Downward_rgb", image3)
-            cv2.waitKey(1)
+            #cv2.imshow("Downward_rgb", image3)
+            #cv2.waitKey(1)
         except Exception as e:
             rospy.loginfo(e)
 
