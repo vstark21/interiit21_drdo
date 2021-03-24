@@ -385,7 +385,9 @@ pair< pair<double, double> , double> Astar(point3d current, point3d dest, vector
                 parent[el] = q.second;
                 g[el] = g[q.second] + norm_elqs;
                 point3d var(mp[start_idx].first.first-mp[el].first.first,mp[start_idx].first.second-mp[el].first.second,mp[start_idx].second-mp[el].second);
-                h[el] = l2_norm(target, mp[el]) + 15.0*pow(mp[el].second - 3.0, 2)  + (mp[start_idx].first.second-mp[el].first.second)*1.0; // + (mp[el].first.first-mp[start_idx].first.first)*2.0;
+                double hit = 15.0*pow(mp[el].second - 3.0, 2);
+                if (mp[el].second>=2.0 || mp[el].second<=4.0) hit = hit/3.0; 
+                h[el] = l2_norm(target, mp[el]) + hit + (mp[start_idx].first.second-mp[el].first.second)*1.0; // + (mp[el].first.first-mp[start_idx].first.first)*2.0;
                 /*note change y back to 1.0*/
                 f[el] = g[el] + h[el];
                 //-20.0*calc_ang(var,orien)

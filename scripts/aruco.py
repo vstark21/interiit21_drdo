@@ -60,41 +60,64 @@ def downcam_callback(data):
             global y,pos,pose_pub
             data = ar.Main(y, pos, down_cam)
             print(data)
-            if data is not None:
+            if data != None:
                 st = Setpoints()
                 poses = Pose()
                 
                 poses.position.x, poses.position.y, poses.position.z = data
                 poses.orientation.x, poses.orientation.y, poses.orientation.z, poses.orientation.w = tf.transformations.quaternion_from_euler(0, 0, math.pi/2) 
                 st.setpoints = [poses]
-                st.header.stamp = rospy.get_rostime()
+                st.header.stamp = rospy.Time.now()
                 st.header.frame_id= "map"
+                pst = PoseStamped()
+                pst.header.stamp = rospy.Time.now()
+                pst.header.frame_id="map"
+                pst.pose = poses
                 pose_pub.publish(st)
+                query_pub.publish(pst)
 
     except Exception as e:
         rospy.loginfo(e)
 
-
 class Aruco_Land():
+    # Constructor
     def __init__(self):
-        self.Flag = False
-        self.Landed = False
-        self.Visited_Aruco = []
-        self.aruco_dict = aruco.Dictionary_get(aruco.DICT_5X5_1000)
+        self.Limits_Initialized = False # To initialize the left right limits for zig-zag motion as per drone position
+        self.Landing = False # Flag for whether we found the correct aruco, and it's time to land
+        self.Landed = False # Flag for whether we finally landed after finding the correct aruco
+        self.Aruco_Position = None # To store the correct aruco position
+        self.Front_Limit = 2.6 # How much to traverse length in forward direction while in zig-zag motion
+        self.Left_Right_Limit = 1.5 # How much to traverse length in left and right direction while in zig-zag motion
+        self.Aruco_Length = 1.1 # Threshold length for aruco / white point detection, To avoid visiting the same aruco again
+        self.Drone_Height = 3.0 # Drone height to maintain while searching the aruco
+        self.Factor = 0.0046 # Factor to scale between image co-ordinate system and real world co-ordinate system
+        self.Threshold_Distance = 0.3 # Threshold distance to check whether drone reached the desired position
+        
+        self.Visited_Aruco = [] # To keep track record of visited aruco
+        self.Aruco_Dict = aruco.Dictionary_get(aruco.DICT_5X5_1000) # Aruco dictionary
     
+    # To calculate the absolute value or modulus of a point
     def Absolute_Value(self, A):
         return math.sqrt(A[0]**2 + A[1]**2)
 
+    # To calculate euclidean distance between two points
+    def Euclidean_Distance(self, A, B):
+        return math.sqrt(((B[0] - A[0])**2) + ((B[1] - A[1])**2))
+
+    # To calculate the perpendicular distance from a point to a line
     def Perpendicular_Distance(self, Line, Point):
         return abs(Line[0] * Point[0] + Line[1] * Point[1] + Line[2]) / self.Absolute_Value(Line[:2]) 
 
+    # To calculate the point of intersection of the perpendicular line drawn from a point to a line
     def Point_of_Intersection(self, Line, Point):
         x = ((Line[1] * (Line[1] * Point[0] - Line[0] * Point[1])) - (Line[0] * Line[2])) / (Line[0]**2 + Line[1]**2)
         y = ((Line[0] * (Line[0] * Point[1] - Line[1] * Point[0])) - (Line[1] * Line[2])) / (Line[0]**2 + Line[1]**2)
         return x, y
 
+    # To initialize the left right limits for zig-zag motion as per drone position
+    # It calculates the equation of lines at left extremum and right extremum at a given distance from drone position
     def Initialize_Limits(self, yaw, pos):
-        self.Flag = True
+        self.Limits_Initialized = True
 
         x1, y1 = self.World_Pos(yaw, pos, [320, 0])
         x2, y2 = self.World_Pos(yaw, pos, [320, 480])
@@ -110,8 +133,8 @@ class Aruco_Land():
         x1, y1 = self.World_Pos(yaw, pos, [0, 240])
         x2, y2 = self.World_Pos(yaw, pos, [640, 240])
 
-        c1 = c + 1.5 * self.Absolute_Value([a,b]) 
-        c2 = c - 1.5 * self.Absolute_Value([a,b])
+        c1 = c + self.Left_Right_Limit * self.Absolute_Value([a,b]) 
+        c2 = c - self.Left_Right_Limit * self.Absolute_Value([a,b])
 
         if self.Perpendicular_Distance([a,b,c1],[x1,y1]) < self.Perpendicular_Distance([a,b,c2],[x1,y1]):
             self.Left = [a,b,c1]
@@ -120,25 +143,32 @@ class Aruco_Land():
             self.Left = [a,b,c2]
             self.Right = [a,b,c1]
 
-        self.last_move = 'L'
+        self.Last_Move = 'L'
 
-    def Aruco(self, img):
+    # To detect aruco and to get their centres and corners
+    def Aruco(self, yaw, img):
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         _, thresh = cv2.threshold(gray,150,255,cv2.THRESH_BINARY)
-        corners, ids, _ = aruco.detectMarkers(thresh, self.aruco_dict, parameters=aruco.DetectorParameters_create())
+        corners, ids, _ = aruco.detectMarkers(thresh, self.Aruco_Dict, parameters=aruco.DetectorParameters_create())
  
         Centres = []
+        Limits = []
         for i, corner in enumerate(corners):
             x = int((corner[0][0][0] + corner[0][2][0]) / 2)
             y = int((corner[0][0][1] + corner[0][2][1]) / 2)
-            
+
+            Limits.append(corner[0].tolist())
+
             if ids[i][0] == 0:
-                return [[x,y]], True
+                self.Landing = True
+                self.Aruco_Position = self.World_Pos(yaw, pos, [x,y])
+                return None, None
 
             Centres.append([x,y])
 
-        return Centres, False
+        return Centres, Limits
 
+    # To detect white point and to get their centres
     def White_Points(self, img):
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         _, thresh = cv2.threshold(gray,150,255,cv2.THRESH_BINARY)
@@ -160,9 +190,7 @@ class Aruco_Land():
         
         return Centres
 
-    def Euclidean_Distance(self, A, B):
-        return math.sqrt(((B[0] - A[0])**2) + ((B[1] - A[1])**2))
-
+    # To convert the image co-ordinates into the real world co-ordinate system
     def World_Pos(self, yaw, pos, centre):
         del_x = centre[0] - 320
         del_y = 240 - centre[1]
@@ -189,7 +217,7 @@ class Aruco_Land():
         if del_y > 0:
             fac_x *= -1            
         
-        factor = 0.003 * pos[2]
+        factor = self.Factor * pos[2]
         real_length = Length * factor
     
         real_x = real_length * fac_x + pos[0]
@@ -197,16 +225,23 @@ class Aruco_Land():
     
         return real_x, real_y
 
+    # To follow zig-zag motion while no optimal point is available to visit
+    # |------------<|
+    # |>-----------^|
+    # |^-----------<|
+    # |      D-----^|
+    # It moves drone from left extremum to right extremum and vice versa
+    # It also makes drone traverse in forward direction with an optimal distance
     def No_Point(self, yaw, pos):
         left_distance = self.Perpendicular_Distance(self.Left, pos)
         right_distance = self.Perpendicular_Distance(self.Right, pos)
 
-        if (self.last_move == 'R' and left_distance < 0.3) or (self.last_move == 'L' and right_distance < 0.3) or self.Current_Front_Distance > 0.3:
+        if (self.Last_Move == 'R' and left_distance < self.Threshold_Distance) or (self.Last_Move == 'L' and right_distance < self.Threshold_Distance) or self.Current_Front_Distance > self.Threshold_Distance:
             if self.Switch:
-                if self.last_move == 'L':
-                    self.last_move = 'R'
-                elif self.last_move == 'R':
-                    self.last_move = 'L'
+                if self.Last_Move == 'L':
+                    self.Last_Move = 'R'
+                elif self.Last_Move == 'R':
+                    self.Last_Move = 'L'
 
                 x1, y1 = self.World_Pos(yaw, pos, [0, 240])
                 x2, y2 = self.World_Pos(yaw, pos, [640, 240])
@@ -215,8 +250,8 @@ class Aruco_Land():
                 b = x1 - x2
                 c = x2 * y1 - y2 * x1
 
-                c1 = c + 2.6 * self.Absolute_Value([a,b]) 
-                c2 = c - 2.6 * self.Absolute_Value([a,b])
+                c1 = c + self.Front_Limit * self.Absolute_Value([a,b]) 
+                c2 = c - self.Front_Limit * self.Absolute_Value([a,b])
 
                 x, y = self.World_Pos(yaw, pos, [320, 0])
 
@@ -230,50 +265,61 @@ class Aruco_Land():
             x, y = self.Point_of_Intersection(self.Front, pos)
             self.Current_Front_Distance = self.Perpendicular_Distance(self.Front, pos)    
 
-        elif self.last_move == 'L':
+        elif self.Last_Move == 'L':
             x, y = self.Point_of_Intersection(self.Right, pos)
             self.Switch = True
-        elif self.last_move == 'R':
+        elif self.Last_Move == 'R':
             x, y = self.Point_of_Intersection(self.Left, pos)
             self.Switch = True
         
-        return [x, y, 3.0]
+        return [x, y, self.Drone_Height]
 
+    # It combines everything on priority basis and returns the setpoints where drone has to go
+    # First it searches for aruco, if correct aruco is found we land, if not we visit nearest incorrect aruco and marks it visited
+    # If no aruco is found we search for white points, if found and is unvisited, we visit it
+    # If nothing is found in frame or no optimal point is available to visit we follow zig-zag motion until it finds an optimal point to visit
+    # Here optimal point means something that is still unvisited 
     def Main(self, yaw, pos, img):
         if self.Landed:
             return None
 
-        Centres, Flag = self.Aruco(img)
-    
-        if Flag:
-            x, y = self.World_Pos(yaw, pos, Centres[0])
-            if self.Euclidean_Distance([x,y], pos) < 0.6 and pos[2] > 2.6:
+        if not self.Landing:
+            Centres, Limits = self.Aruco(yaw, img)
+        
+        if self.Landing:
+            x, y = self.Aruco_Position
+            if self.Euclidean_Distance([x,y], pos) > 0.5:
+                return [x, y, self.Drone_Height]
+            elif self.Euclidean_Distance([x,y], pos) > self.Threshold_Distance:
                 return [x, y, 2.0]
-            elif self.Euclidean_Distance([x,y], pos) < 0.35 and pos[2] > 1.6:
+            else:
                 self.Landed = True
-                return [x, y, 0.15]
+                return [x, y, 0.0]
         
         Unvisited = []
-        for Centre in Centres:
+        for Centre, Limit in zip(Centres, Limits):
             world_pos = self.World_Pos(yaw, pos, Centre)
             Flag = False
             for P in self.Visited_Aruco:
-                if self.Euclidean_Distance(P, world_pos) < 2.2:
+                if self.Euclidean_Distance(P, world_pos) < self.Aruco_Length:
                     Flag = True
                     break
             if not Flag:
-                Unvisited.append([self.Euclidean_Distance(pos, world_pos), world_pos])
+                List = [self.Euclidean_Distance(pos, world_pos), world_pos]
+                for Position in Limit:
+                    List.append(self.World_Pos(yaw, pos, Position))
+                Unvisited.append(List)
         
         if len(Unvisited):
             Unvisited = sorted(Unvisited)
             x, y = Unvisited[0][1]
  
-            if Unvisited[0][0] < 0.6:
-                self.Visited_Aruco.append([x,y])
-            if not self.Flag:
+            if Unvisited[0][0] < self.Threshold_Distance:
+                self.Visited_Aruco.extend(Unvisited[0][1:])
+            if not self.Limits_Initialized:
                 self.Initialize_Limits(yaw, pos)
 
-            return [x, y, 3.0]
+            return [x, y, self.Drone_Height]
 
         Centres = self.White_Points(img)
     
@@ -282,7 +328,7 @@ class Aruco_Land():
             world_pos = self.World_Pos(yaw, pos, Centre)
             Flag = False
             for P in self.Visited_Aruco:
-                if self.Euclidean_Distance(P, world_pos) < 2.2:
+                if self.Euclidean_Distance(P, world_pos) < self.Aruco_Length:
                     Flag = True
                     break
             if not Flag:
@@ -292,13 +338,13 @@ class Aruco_Land():
             Unvisited = sorted(Unvisited)
             x, y = Unvisited[0][1]
 
-            if not self.Flag:
+            if not self.Limits_Initialized:
                 self.Initialize_Limits(yaw, pos)
 
-            return [x, y, 3.0]
+            return [x, y, self.Drone_Height]
         
-        #if self.Flag:
-        #    return self.No_Point(yaw, pos)
+        if self.Limits_Initialized:
+            return self.No_Point(yaw, pos)
 
        
 if __name__ == "__main__":
@@ -312,6 +358,7 @@ if __name__ == "__main__":
 
     rospy.Subscriber("/camera/color/image_raw", Image, downcam_callback)
     pose_pub = rospy.Publisher("/setpoint_array", Setpoints, queue_size=1)
+    query_pub = rospy.Publisher("/query_point", PoseStamped, queue_size=1)
     while(pos==None):
         continue
         

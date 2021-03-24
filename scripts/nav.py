@@ -226,6 +226,7 @@ class Controller:
                     break
                 else:
                     set_point = self.set_array.pop(0)
+                    print(set_point)
                     self.goto(set_point)
 
             rate.sleep()
