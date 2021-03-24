@@ -29,80 +29,47 @@ pos=None
 r=None
 p=None
 y=None
-class Controller:
+timestamp = rospy.Time()
+bridge = CvBridge()
+down_cam=np.zeros((640,400,3),np.uint8)
 
-    def __init__(self,aruco=None):
-        rospy.init_node('camera_node')
-        rospy.Subscriber("/mavros/state", State, self.state_callback)
-        rospy.Subscriber("/mavros/local_position/pose", PoseStamped, self.pos_callback)
-        # Better to comment these lines, unless you need them
-        # rospy.Subscriber("/depth_camera/rgb/image_raw", Image, self.dpcamrgb_callback)
-        # rospy.Subscriber("/depth_camera/depth/image_raw", Image, self.dpcam_callback)
-
-        rospy.Subscriber("/camera/color/image_raw", Image, self.downcam_callback)
-        self.cmd_pos_pub = rospy.Publisher("/mavros/setpoint_position/local", PoseStamped, queue_size=1)
-        self.cmd_vel_pub = rospy.Publisher("/mavros/setpoint_velocity/cmd_vel_unstamped", Twist, queue_size=1)
-
-       
-        self.aruco = aruco
-        self.pose = Pose()
-        self.state = State()
-        self.timestamp = rospy.Time()
-        self.bridge = CvBridge()
-        self.down_cam=np.zeros((640,400,3),np.uint8)
-
-    def state_callback(self, data):
-        self.state = data
-        # print(data)
-
-    def pos_callback(self, data):
-        self.timestamp = data.header.stamp
-        self.pose = data.pose
-        global pos
+def pos_callback(data):
+    timestamp = data.header.stamp
+    pose = data.pose
+    global pos
               
-        pos=[ data.pose.position.x, data.pose.position.y, data.pose.position.z]
-        global r,p,y
-        quats = [self.pose.orientation.w,
-                self.pose.orientation.x,
-                self.pose.orientation.y,
-                self.pose.orientation.z]
-        r,p,y = tf.transformations.euler_from_quaternion(quats)
-       
-    
-    def dpcamrgb_callback(self, data):
-        try:
-            bridge = CvBridge()
-            image1 = bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')[:, :, ::-1]
-            cv2.imshow("Forward_rgb", image1)
-            cv2.waitKey(1)
-        except Exception as e:
-            rospy.loginfo(e)
-    
-    def dpcam_callback(self, data):
-        try:
-            bridge = CvBridge()
-            image2 = bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')
-            cv2.imshow("Forward_depth", image2)
-            cv2.waitKey(1)
-        except Exception as e:
-            rospy.loginfo(e)
+    pos=[ data.pose.position.x, data.pose.position.y, data.pose.position.z]
+    global r,p,y
+    quats = [pose.orientation.w,
+                pose.orientation.x,
+                pose.orientation.y,
+                pose.orientation.z]
+    r,p,y = tf.transformations.euler_from_quaternion(quats)
 
-    def downcam_callback(self, data):
+def downcam_callback(data):
        
-        try:
-            bridge = CvBridge()
-            image3 = bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')[:, :, ::-1]
+    try:
+        bridge = CvBridge()
+        image3 = bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')[:, :, ::-1]
             
             
             
-            self.down_cam=image3
-            if self.aruco is not None:
-                global y,pos
-                print(self.aruco.Main(y, [self.pose.position.x, self.pose.position.y, self.pose.position.z], self.down_cam))
-            cv2.imshow("Downward_rgb", image3)
-            cv2.waitKey(1)
-        except Exception as e:
-            rospy.loginfo(e)
+        down_cam=image3
+        global ar
+        if ar is not None:
+            global y,pos,pose_pub
+            data = ar.Main(y, pos, down_cam)
+            setpoints = Setpoints()
+            pose = Pose()
+            pose.position.x, pose.position.y, pose.position.z = data
+            setpoints.setpoints = [pose]
+            setpoints.header.stamp = rospy.get_rostime()
+            setpoints.header.frame_id= "map"
+            pose_pub.publish(setpoints)
+
+    except Exception as e:
+        rospy.loginfo(e)
+
 
 class Aruco_Land():
     def __init__(self):
@@ -139,8 +106,8 @@ class Aruco_Land():
         x1, y1 = self.World_Pos(yaw, pos, [0, 240])
         x2, y2 = self.World_Pos(yaw, pos, [640, 240])
 
-        c1 = c + 1.5 * self.Absolute_Value([a,b]) 
-        c2 = c - 1.5 * self.Absolute_Value([a,b])
+        c1 = c + 3.0 * self.Absolute_Value([a,b]) 
+        c2 = c - 3.0 * self.Absolute_Value([a,b])
 
         if self.Perpendicular_Distance([a,b,c1],[x1,y1]) < self.Perpendicular_Distance([a,b,c2],[x1,y1]):
             self.Left = [a,b,c1]
@@ -244,8 +211,8 @@ class Aruco_Land():
                 b = x1 - x2
                 c = x2 * y1 - y2 * x1
 
-                c1 = c + 2.6 * self.Absolute_Value([a,b]) 
-                c2 = c - 2.6 * self.Absolute_Value([a,b])
+                c1 = c + 2.3 * self.Absolute_Value([a,b]) 
+                c2 = c - 2.3 * self.Absolute_Value([a,b])
 
                 x, y = self.World_Pos(yaw, pos, [320, 0])
 
@@ -276,11 +243,11 @@ class Aruco_Land():
     
         if Flag:
             x, y = self.World_Pos(yaw, pos, Centres[0])
-            if self.Euclidean_Distance([x,y], pos) < 0.55 and pos[2] > 2.6:
+            if self.Euclidean_Distance([x,y], pos) < 0.6 and pos[2] > 2.6:
                 return [x, y, 2.0]
-            elif self.Euclidean_Distance([x,y], pos) < 0.3 and pos[2] > 1.6:
+            elif self.Euclidean_Distance([x,y], pos) < 0.35 and pos[2] > 1.6:
                 self.Landed = True
-                return [x, y, 0.05]
+                return [x, y, 0.15]
         
         Unvisited = []
         for Centre in Centres:
@@ -302,7 +269,7 @@ class Aruco_Land():
             if not self.Flag:
                 self.Initialize_Limits(yaw, pos)
 
-            return [x, y, 2.0]
+            return [x, y, 3.0]
 
         Centres = self.White_Points(img)
     
@@ -311,7 +278,7 @@ class Aruco_Land():
             world_pos = self.World_Pos(yaw, pos, Centre)
             Flag = False
             for P in self.Visited_Aruco:
-                if self.Euclidean_Distance(P, world_pos) < 2.5:
+                if self.Euclidean_Distance(P, world_pos) < 2.2:
                     Flag = True
                     break
             if not Flag:
@@ -324,21 +291,27 @@ class Aruco_Land():
             if not self.Flag:
                 self.Initialize_Limits(yaw, pos)
 
-            return [x, y, 2.0]
+            return [x, y, 3.0]
         
         if self.Flag:
             return self.No_Point(yaw, pos)
+
        
 if __name__ == "__main__":
-    cont = Controller()
+    ar = Aruco_Land()
+    rospy.init_node('camera_node')
+    #rospy.Subscriber("/mavros/state", State, state_callback)
+    rospy.Subscriber("/mavros/local_position/pose", PoseStamped, pos_callback)
+        # Better to comment these lines, unless you need them
+        # rospy.Subscriber("/depth_camera/rgb/image_raw", Image, self.dpcamrgb_callback)
+        # rospy.Subscriber("/depth_camera/depth/image_raw", Image, self.dpcam_callback)
+
+    rospy.Subscriber("/camera/color/image_raw", Image, downcam_callback)
+    pose_pub = rospy.Publisher("/setpoint_array", Setpoints, queue_size=1)
     while(pos==None):
         continue
         
-    ar = Aruco_Land()
-    cont.aruco = ar
-    # Flight variables
-    takeoff_height = 3
-    velocity = 0.6
+    
 
     #cont.connect()
     #cont.takeoff(takeoff_height)
