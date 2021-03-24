@@ -164,6 +164,7 @@ int main(int argc, char **argv){
         //               x.second - Current.z());
         //Orien = new_orien;
         //print3d(Current);
+        repel.push_back(x);
         point3d new_x(x.first.first, x.first.second, x.second);
         ROS_INFO("SETPOINT : ");
         print3d(new_x);

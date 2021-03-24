@@ -18,6 +18,8 @@ point3d bbx_size(6.0, 10.0, 3.5);
 point3d bbx_size1(6.0, 2.0, 3.5);
 point3d prev_norm(0.0 ,0.0 ,0.0);
 point3d loc(-100.0,-100.0,-100.0);
+vector<pair< pair<double, double> , double>> repel;
+
 void getBoxesBoundingBox(
     const point3d& position,
     const point3d& bounding_box_size,
@@ -387,7 +389,15 @@ pair< pair<double, double> , double> Astar(point3d current, point3d dest, vector
                 point3d var(mp[start_idx].first.first-mp[el].first.first,mp[start_idx].first.second-mp[el].first.second,mp[start_idx].second-mp[el].second);
                 double hit = 15.0*pow(mp[el].second - 2.5, 2);
                 if (mp[el].second>=1.5 || mp[el].second<=3.5) hit = hit/3.0; 
-                h[el] = 2.0*l2_norm(target, mp[el]) + hit + (mp[start_idx].first.second-mp[el].first.second)*0.5; // + (mp[el].first.first-mp[start_idx].first.first)*2.0;
+                long long int r=0;
+                for(int it=0;it<(repel.size()-5);it++)
+                {
+                    int k=5;
+                    int d= l2_norm(repel.at(it),mp[el]);
+                    if(d==0) r+=1000000;
+                    else r+= k/(d*d);
+                }
+                h[el] = 2.0*l2_norm(target, mp[el]) + hit + r + (mp[start_idx].first.second-mp[el].first.second)*0.5; // + (mp[el].first.first-mp[start_idx].first.first)*2.0;
                 /*note change y back to 1.0*/
                 f[el] = g[el] + h[el];
                 //-20.0*calc_ang(var,orien)
