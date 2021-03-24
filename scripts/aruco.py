@@ -59,13 +59,17 @@ def downcam_callback(data):
         if ar is not None:
             global y,pos,pose_pub
             data = ar.Main(y, pos, down_cam)
-            setpoints = Setpoints()
-            pose = Pose()
-            pose.position.x, pose.position.y, pose.position.z = data
-            setpoints.setpoints = [pose]
-            setpoints.header.stamp = rospy.get_rostime()
-            setpoints.header.frame_id= "map"
-            pose_pub.publish(setpoints)
+            print(data)
+            if data is not None:
+                st = Setpoints()
+                poses = Pose()
+                
+                poses.position.x, poses.position.y, poses.position.z = data
+                poses.orientation.x, poses.orientation.y, poses.orientation.z, poses.orientation.w = tf.transformations.quaternion_from_euler(0, 0, math.pi/2) 
+                st.setpoints = [poses]
+                st.header.stamp = rospy.get_rostime()
+                st.header.frame_id= "map"
+                pose_pub.publish(st)
 
     except Exception as e:
         rospy.loginfo(e)
@@ -106,8 +110,8 @@ class Aruco_Land():
         x1, y1 = self.World_Pos(yaw, pos, [0, 240])
         x2, y2 = self.World_Pos(yaw, pos, [640, 240])
 
-        c1 = c + 3.0 * self.Absolute_Value([a,b]) 
-        c2 = c - 3.0 * self.Absolute_Value([a,b])
+        c1 = c + 1.5 * self.Absolute_Value([a,b]) 
+        c2 = c - 1.5 * self.Absolute_Value([a,b])
 
         if self.Perpendicular_Distance([a,b,c1],[x1,y1]) < self.Perpendicular_Distance([a,b,c2],[x1,y1]):
             self.Left = [a,b,c1]
@@ -211,8 +215,8 @@ class Aruco_Land():
                 b = x1 - x2
                 c = x2 * y1 - y2 * x1
 
-                c1 = c + 2.3 * self.Absolute_Value([a,b]) 
-                c2 = c - 2.3 * self.Absolute_Value([a,b])
+                c1 = c + 2.6 * self.Absolute_Value([a,b]) 
+                c2 = c - 2.6 * self.Absolute_Value([a,b])
 
                 x, y = self.World_Pos(yaw, pos, [320, 0])
 
@@ -293,8 +297,8 @@ class Aruco_Land():
 
             return [x, y, 3.0]
         
-        if self.Flag:
-            return self.No_Point(yaw, pos)
+        #if self.Flag:
+        #    return self.No_Point(yaw, pos)
 
        
 if __name__ == "__main__":
