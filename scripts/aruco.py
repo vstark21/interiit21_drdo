@@ -346,7 +346,6 @@ class Aruco_Land():
         if self.Limits_Initialized:
             return self.No_Point(yaw, pos)
 
-       
 if __name__ == "__main__":
     ar = Aruco_Land()
     rospy.init_node('camera_node')
