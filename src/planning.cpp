@@ -67,10 +67,11 @@ pair< pair<double, double> , double> drone_crash(point3d current, pair< pair<dou
 pair<pair<double, double> , double> step(point3d current, pair<pair<double, double> , double> sp){
     point3d te(sp.first.first, sp.first.second, sp.second);
     double val = l2_norm(te,current);
-    if (val<=0.8)return sp;
     te-=current;
     te = te.normalize();
-    te*= 0.8;
+    te*= 0.5;
+    if(val>1.5)te*=1.8;
+    if (val<=0.5)te*=1.5*val;
     te+=current;
     
     pair<pair<double, double> , double> setpoint;
@@ -149,7 +150,7 @@ int main(int argc, char **argv){
 
         vector<pair< pair<double, double> , double> > mp;
         for(auto i:m){
-            if(i.second<=8.0 && !check_occupancy(point3d(i.first.first.first, i.first.first.second, i.first.second),ref_octree, 0.3))mp.push_back(i.first);//   
+            if(i.second<=8.0 && !check_occupancy(point3d(i.first.first.first, i.first.first.second, i.first.second),ref_octree, 0.4))mp.push_back(i.first);//   
         }
 
         ROS_INFO("Size of mp : %d",(int)mp.size() );
