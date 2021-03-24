@@ -1,4 +1,4 @@
-﻿interiit21_drdo
+﻿## interiit21_drdo
 
 First follow the instructions in [Installation.md](Installation.md) file.
 
@@ -8,7 +8,7 @@ Install the following:
 sudo apt-get install python-wstool python-rosinstall-generator python-catkin-tools
 ```
 
-Then, initialize the catkin workspace:
+Then, initialize the catkin workspace and clone this repo in catkin workspace
 
 ```sh
 mkdir -p ~/catkin_ws/src
@@ -16,27 +16,21 @@ cd ~/catkin_ws
 catkin init
 echo "source ~/catkin_ws/devel/setup.bash" >> ~/.bashrc
 source ~/.bashrc
-```
 
-Then clone this repo in catkin workspace
-
-```sh
+# Clone this repo
 cd ~/catkin_ws/src
 git clone https://github.com/vstark21/interiit21_drdo.git
-```
 
-and then
-
-```sh
+# Build workspace
 cd ~/catkin_ws
 catkin build
 ```
 
-And make all the files in scripts directory executable
+And make all the files in scripts directory executable (replace `filename` with different filenames)
 
 ```sh
 cd ~/catkin_ws/src/interiit21_drdo/scripts
-sudo chmod +x nav.py
+sudo chmod +x filename.py 
 ```
 
 Now remove `gimbal_small_2d/` directory
@@ -46,32 +40,14 @@ cd ~/.gazebo/models
 rm -r gimbal_small_2d
 ```
 
-Using nav.py file
+To run different worlds, 
 
 ```sh
-rosrun interiit21_drdo nav.py
+roscd interiit21_drdo
+./world1.sh # or ./world2.sh or ./world3.sh
 ```
 
-
-launching rtabmap
-```sh
-roslaunch interiit21_drdo slam.launch
-
-### or 
-
-roslaunch rtabmap_ros rtabmap.launch     rtabmap_args:="--delete_db_on_start"    frame_id:=camera_link_optical rgb_topic:=/depth_camera/rgb/image_raw     depth_topic:=/depth_camera/depth/image_raw     camera_info_topic:=/depth_camera/depth/camera_info  rviz:=true
-```
-
-controlling using setpoint
-```bash
-rosrun interiit21_drdo nav.py
-
-## along side with this in another terminal
-
-rosrun interiit21_drdo aruco.py
-```
-
-## Topics
+### Topics
 
 Octomap output
 ```bash
