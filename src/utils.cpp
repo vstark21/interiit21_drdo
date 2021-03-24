@@ -17,7 +17,7 @@ using namespace octomap;
 point3d bbx_size(6.0, 10.0, 3.5);
 point3d bbx_size1(6.0, 2.0, 3.5);
 point3d prev_norm(0.0 ,0.0 ,0.0);
-
+point3d loc(-100.0,-100.0,-100.0);
 void getBoxesBoundingBox(
     const point3d& position,
     const point3d& bounding_box_size,
@@ -202,23 +202,23 @@ point3d decide(point3d current, point3d prev, point3d orien, OcTree* octree){
     
     double length = 5.0;
     point3d pull;
-    if(current.z() <= 3.0){
-        point3d pull_(0.0, 0.0, 1.5*pow(3.0 - current.z(), 2));
+    if(current.z() <= 2.5){
+        point3d pull_(0.0, 0.0, 1.5*pow(2.5 - current.z(), 2));
         pull = pull_;
     }
     else{
-        point3d pull_(0.0, 0.0, -1.5*pow(3.0 - current.z(), 2));
+        point3d pull_(0.0, 0.0, -1.5*pow(2.5 - current.z(), 2));
         pull = pull_;
     }
     // prev = current;
     point3d f1(orien.x(), orien.y(), 0.0);
     point3d f2(prev.x() - current.x(), prev.y() - current.y(), 0.0);
-
+    point3d f3(loc.x()-current.x(), loc.y() - current.y(), 0.0);
     
     point3d orien_norm = f1.normalize();
-    if(l2_norm(f2)>0.5){
-        prev_norm = f2.normalize();
-        prev_norm *= 12.0; //point3d(1.1*prev_norm.x(),
+    if(l2_norm(f3)>0.7){
+        prev_norm = f2; //.normalize();
+        prev_norm *= 3.0; //point3d(1.1*prev_norm.x(),
     }
     // if(prev_norm.y() + orien_norm.y() )
     point3d new_dir =  prev_norm + orien_norm; //  + point3d(-1,0,0); // + accum.normalize();
@@ -235,17 +235,17 @@ point3d decide(point3d current, point3d prev, point3d orien, OcTree* octree){
     // bbx_size = new_bbx;
 
     cout << length << endl;
-    //if(new_dir.z() + current.z() >= 0.5 && new_dir.z() + current.z() <= 4.5){
-    //    return new_dir + current;
-     //   point3d ans(new_dir.x() + current.x(), new_dir.y() + current.y(), 3.0);
-     //   return ans;
+    if(new_dir.z() + current.z() >= 1.5 && new_dir.z() + current.z() <= 3.5){
+        return new_dir + current;
+    //    point3d ans(new_dir.x() + current.x(), new_dir.y() + current.y(), 3.0);
+    //    return ans;
 
-    //}
-    if(new_dir.z() + current.z() < 3.0){
-        point3d ans(new_dir.x() + current.x(), new_dir.y() + current.y(), 3.5);
+    }
+    if(new_dir.z() + current.z() < 2.5){
+        point3d ans(new_dir.x() + current.x(), new_dir.y() + current.y(), 2.0);
         return ans;
     }
-    point3d ans(new_dir.x() + current.x(), new_dir.y() + current.y(), 2.5);
+    point3d ans(new_dir.x() + current.x(), new_dir.y() + current.y(), 3.0);
     
     return ans;
 }
@@ -385,9 +385,9 @@ pair< pair<double, double> , double> Astar(point3d current, point3d dest, vector
                 parent[el] = q.second;
                 g[el] = g[q.second] + norm_elqs;
                 point3d var(mp[start_idx].first.first-mp[el].first.first,mp[start_idx].first.second-mp[el].first.second,mp[start_idx].second-mp[el].second);
-                double hit = 15.0*pow(mp[el].second - 3.0, 2);
-                if (mp[el].second>=2.0 || mp[el].second<=4.0) hit = hit/3.0; 
-                h[el] = l2_norm(target, mp[el]) + hit + (mp[start_idx].first.second-mp[el].first.second)*1.0; // + (mp[el].first.first-mp[start_idx].first.first)*2.0;
+                double hit = 15.0*pow(mp[el].second - 2.5, 2);
+                if (mp[el].second>=1.5 || mp[el].second<=3.5) hit = hit/3.0; 
+                h[el] = 2.0*l2_norm(target, mp[el]) + hit + (mp[start_idx].first.second-mp[el].first.second)*0.5; // + (mp[el].first.first-mp[start_idx].first.first)*2.0;
                 /*note change y back to 1.0*/
                 f[el] = g[el] + h[el];
                 //-20.0*calc_ang(var,orien)

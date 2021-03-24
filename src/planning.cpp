@@ -65,10 +65,18 @@ pair< pair<double, double> , double> drone_crash(point3d current, pair< pair<dou
 }
 
 pair<pair<double, double> , double> step(point3d current, pair<pair<double, double> , double> sp){
+    point3d te(sp.first.first, sp.first.second, sp.second);
+    double val = l2_norm(te,current);
+    if (val<=0.8)return sp;
+    te-=current;
+    te = te.normalize();
+    te*= 0.8;
+    te+=current;
+    
     pair<pair<double, double> , double> setpoint;
-    setpoint.first.first = (4*current.x() + sp.first.first) / 5.0;
-    setpoint.first.second = (4*current.y() + sp.first.second) / 5.0;
-    setpoint.second = (4*current.z() + sp.second) / 5.0;
+    setpoint.first.first =te.x(); // (4*current.x() + sp.first.first) / 5.0;
+    setpoint.first.second =te.y(); // (4*current.y() + sp.first.second) / 5.0;
+    setpoint.second =te.z(); // (4*current.z() + sp.second) / 5.0;
     return setpoint;
 }
 
@@ -100,6 +108,7 @@ int main(int argc, char **argv){
     point3d dest;
     octomap::OcTree* ref_octree = Octree;
     ROS_INFO("started");
+    //loc = ref_current;
     for(int check=0;ros::ok()&&(check>-1);check++){
     // for(int check=0;check<1;check++){
         
@@ -201,7 +210,7 @@ int main(int argc, char **argv){
             loop_rate.sleep();
         }
         //ros::Duration(2.0).sleep();
-        
+        loc = ref_current;
         ref_orien = Orien;
         ref_current = Current;
         ref_octree = Octree;
