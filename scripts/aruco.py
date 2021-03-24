@@ -89,20 +89,24 @@ class Controller:
 
     def downcam_callback(self, data):
        
-        try:
-            bridge = CvBridge()
-            image3 = bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')[:, :, ::-1]
-            
-            
-            
-            self.down_cam=image3
-            if self.aruco is not None:
-                global y,pos
-                print(self.aruco.Main(y, [self.pose.position.x, self.pose.position.y, self.pose.position.z], self.down_cam))
-            #cv2.imshow("Downward_rgb", image3)
-            #cv2.waitKey(1)
-        except Exception as e:
-            rospy.loginfo(e)
+        def downcam_callback(self, data):
+       
+        bridge = CvBridge()
+        image3 = bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')[:, :, ::-1]
+        
+        
+        
+        self.down_cam=image3
+        if self.aruco is not None:
+            global y,pos
+            pos = self.aruco.Main(y, [self.pose.position.x, self.pose.position.y, self.pose.position.z], self.down_cam)
+            print pos
+            if pos != None:
+                x, y, z = pos
+                self.goto_xyz_rpy(x, y, z, 0, 0, pi_2)
+        #cv2.imshow("Downward_rgb", image3)
+        #cv2.waitKey(1)
+
 
 class Aruco_Land():
     # Constructor
