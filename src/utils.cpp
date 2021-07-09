@@ -14,11 +14,34 @@
 using namespace std;
 using namespace octomap;
 
+<<<<<<< HEAD
 point3d bbx_size(6.0, 10.0, 3.5);
 point3d bbx_size1(6.0, 2.0, 3.5);
 point3d prev_norm(0.0 ,0.0 ,0.0);
 point3d loc(-100.0,-100.0,-100.0);
 vector<pair< pair<double, double> , double>> repel;
+=======
+point3d bbx_size(6.0, 6.0, 3.5);
+point3d accum(0.0, 0.0, 0.0);
+queue<double> qu;
+int qusize=0;
+double total_err=0.0;
+
+/* Calculates error angle between two orientations. */
+double calc_error(point3d cur_orien,point3d prev_orien){
+	point3d cur_orien1(cur_orien.x(),cur_orien.y(),0.0);
+	point3d prev_orien1(prev_orien.x(),prev_orien.y(),0.0);
+	cur_orien1=cur_orien1.normalize();
+	prev_orien1 = prev_orien1.normalize();
+	double val=cur_orien.cross(prev_orien).z();
+	return asin(val);
+}
+
+/* Returns a vector given an angle and the length of vector.*/
+point3d vec(double angle, double val){
+	return point3d(val*cos(angle),val*sin(angle),0.0);
+}
+>>>>>>> master
 
 /* Returns a vector of points which are occupied around a point(position)
  * with in a bounding box (with sizes bounding_box_size) */
@@ -109,13 +132,18 @@ void print3d(point3d f3){
 }
 
 /* Returns euclidean distance between given points (a, b).*/
+<<<<<<< HEAD
 double l2_norm(point3d a, point3d b = point3d(0.0, 0.0, 0.0)){
+=======
+double l2_norm(point3d a, point3d b){
+>>>>>>> master
     // No need of sqrt
     return sqrt(pow(a.x()- b.x(), 2) + 
                     pow(a.y() - b.y(), 2) +
                     pow(a.z() - b.z(), 2));
 }
 
+<<<<<<< HEAD
 double calc_ang(point3d a,point3d b){
     a=a.normalize();
     b=b.normalize();
@@ -131,6 +159,15 @@ bool raycast(point3d src, point3d dest, OcTree* octree, bool ignoreUnknownCells=
     if(dest.z() <= 0.3)return true;
     if(src.z() >= 4.7)return true;
     if(dest.z() >= 4.7)return true;
+=======
+/** Casts a ray from a point(src) to another point(dest) in a given octree, 
+ * and returns true if hit, else returns false. */
+bool raycast(point3d src, point3d dest, OcTree* octree, bool ignoreUnknownCells=true){
+    if(src.z() < 0.3)return true;
+    if(dest.z() < 0.3)return true;
+    if(src.z() > 4.7)return true;
+    if(dest.z() > 4.7)return true;
+>>>>>>> master
 
     if(src == dest)return false;
 
@@ -268,7 +305,11 @@ point3d decide(point3d current, point3d prev, point3d orien, OcTree* octree){
 
 /** Creates adjacency matrix with the help of raycast function and performs path planning from 
  * current position to destination using A* algorithm. */
+<<<<<<< HEAD
 pair< pair<double, double> , double> Astar(point3d current, point3d dest, vector<pair< pair<double, double> , double> >& mp, OcTree* octree,point3d orien){
+=======
+pair< pair<double, double> , double> Astar(point3d current, point3d dest, vector<pair< pair<double, double> , double> >& mp, OcTree* octree){
+>>>>>>> master
 
     // OccupancyOcTreeBase<OcTreeNode>* octree_ = (OccupancyOcTreeBase<OcTreeNode>*) octree;
 

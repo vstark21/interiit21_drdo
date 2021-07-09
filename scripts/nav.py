@@ -18,26 +18,34 @@ pi_2 = math.pi / 2.0
 global KILL_THREAD
 KILL_THREAD = False
 
+"""
+A custom `Controller` which subscribes to required topics and publishes to some of 
+mavros topics related to navigation.
+"""
 class Controller:
 
     def __init__(self):
         rospy.init_node('control_node')
+
+        # Subcribers
         rospy.Subscriber("/mavros/state", State, self.state_callback)
         rospy.Subscriber("/mavros/local_position/pose", PoseStamped, self.pos_callback)
         # Better to comment these lines, unless you need them
         # rospy.Subscriber("/depth_camera/rgb/image_raw", Image, self.dpcamrgb_callback)
         # rospy.Subscriber("/depth_camera/depth/image_raw", Image, self.dpcam_callback)
         rospy.Subscriber("/camera/color/image_raw", Image, self.downcam_callback)
+        rospy.Subscriber("/setpoint_array",Setpoints,self.setpoint_callback)
 
+        # Publishers
         self.set_control = rospy.Publisher("/setpoint_array",Setpoints,queue_size=1)
         self.cmd_pos_pub = rospy.Publisher("/mavros/setpoint_position/local", PoseStamped, queue_size=1)
         self.cmd_vel_pub = rospy.Publisher("/mavros/setpoint_velocity/cmd_vel_unstamped", Twist, queue_size=1)
 
+        # Services
         self.mode_service = rospy.ServiceProxy("/mavros/set_mode", SetMode)
         self.arm_service = rospy.ServiceProxy('/mavros/cmd/arming', CommandBool)
         self.takeoff_service = rospy.ServiceProxy('/mavros/cmd/takeoff', CommandTOL)
 
-        rospy.Subscriber("/setpoint_array",Setpoints,self.setpoint_callback)
         self.epsilon = 0.1
         self.pose = Pose()
         self.state = State()
@@ -47,6 +55,8 @@ class Controller:
         self.set_array = Setpoints()
 
 
+    # Different callback functions for different topics subscribed.
+    
     def state_callback(self, data):
         self.state = data
 
@@ -88,7 +98,8 @@ class Controller:
             cv2.waitKey(1)
         except Exception as e:
             rospy.loginfo(e)
-    
+
+    # Different publisher functions, name of function tells what it does.
     def goto(self, pose):
         pose_stamped = PoseStamped()
         pose_stamped.header.stamp = rospy.Time.now()
@@ -126,6 +137,8 @@ class Controller:
 
         self.cmd_vel_pub.publish(vel)
 
+    # Movement functions to move forward, move backward, move left, move right, 
+    # rotate clockwise and rotate counter-clockwise
     def moveF(self, vel):
         quats = [self.pose.orientation.w,
                 self.pose.orientation.x,
@@ -198,6 +211,7 @@ class Controller:
         land_resp = self.mode_service(custom_mode="9")
         self.disarm()
     
+    # This function connects to quadcopter and waits until the mode of quadcopter is set to `GUIDED`
     def connect(self):
 
         vel = Twist()
@@ -216,6 +230,7 @@ class Controller:
         
         rospy.loginfo("Mode set to `GUIDED`")
 
+    # This function navigates quadcopter through the points stored in self.set_array 
     def follow_path(self):
         set_point = self.set_array.pop(0)
         self.goto(set_point)
@@ -233,9 +248,11 @@ class Controller:
         self.run = False
         return 0
     
+    # Returns square of distance between two points.
     def dist(self, poseA, poseB):
         return (poseA.position.x-poseB.position.x)**2 + (poseA.position.y-poseB.position.y)**2 + (poseA.position.z-poseB.position.z)**2
 
+# Function which runs on different thread for manual controlling of quadcopter.
 def take_inputs(velocity, controller):
     msg = """
         Reading from the keyboard  and Publishing to Drone!

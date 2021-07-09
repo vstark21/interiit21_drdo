@@ -54,6 +54,7 @@ def downcam_callback(data):
             
             
             
+<<<<<<< HEAD
         down_cam=image3
         global ar
         if ar is not None:
@@ -78,6 +79,16 @@ def downcam_callback(data):
 
     except Exception as e:
         rospy.loginfo(e)
+=======
+            self.down_cam=image3
+            if self.aruco is not None:
+                global y,pos
+                print(self.aruco.Main(y, [self.pose.position.x, self.pose.position.y, self.pose.position.z], self.down_cam))
+            #cv2.imshow("Downward_rgb", image3)
+            #cv2.waitKey(1)
+        except Exception as e:
+            rospy.loginfo(e)
+>>>>>>> master
 
 class Aruco_Land():
     # Constructor
@@ -176,8 +187,13 @@ class Aruco_Land():
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5,5))
         thresh = cv2.morphologyEx(thresh, cv2.MORPH_DILATE, kernel, iterations = 5)
 
+<<<<<<< HEAD
         contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE) # For Windows
         # _, contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE) # For Linux
+=======
+        # contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE) # For Windows
+        _, contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE) # For Linux
+>>>>>>> master
 
         Centres = []
         for contour in contours:

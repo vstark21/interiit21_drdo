@@ -16,6 +16,7 @@ bool odom_empty = true;
 point3d Current(-3.11, 1.2, 2.99);
 point3d Orien(-0.5, 0.5, 0.0); // sy 0 cy
 
+
 /* Callback function to recieve octomap generated and published by rtabmap.*/
 void octomap_callback(const octomap_msgs::Octomap &msg)
 {
@@ -85,6 +86,7 @@ pair<pair<double, double> , double> step(point3d current, pair<pair<double, doub
 }
 
 int main(int argc, char **argv){
+    /* Initializing node, subscribing to required topics and creating different publishers to publish data to required topics. */
     ros::init(argc, argv, "planner_node");
     ros::NodeHandle nh;
     ROS_INFO("Setup");
@@ -95,12 +97,8 @@ int main(int argc, char **argv){
 
     // octomap::AbstractOcTree* tree = AbstractOcTree::read("/home/vishwas/Downloads/octomap_updated.ot");
     // OcTree* Octree = (OcTree*)tree;
-    
-    // Need to read position and orientation of drone
-    
-    //sy 0 cy
 
-    
+
     ros::Rate loop_rate(10);
     while (ros::ok() &&(map_empty || odom_empty)){
         ROS_INFO("INSIDE WHILE");
