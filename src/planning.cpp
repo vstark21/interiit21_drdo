@@ -44,10 +44,10 @@ void odom_callback(const nav_msgs::Odometry &msg)
 }
 
 /* Returns a point around given setpoint which is safe for the quadcopter to navigate from current to that point. */
-pair< pair<double, double> , double> drone_crash(point3d current, pair< pair<double, double> , double> setpoint, OcTree* octree, int count_crash, double fac=0.2){
+pair< pair<double, double> , double> drone_crash(point3d current, pair< pair<double, double> , double> setpoint, OcTree* octree, int count_crash, double fac=0.1){
     double fac_x=fac, fac_y=fac, fac_z=fac;
-    double dronex = 0.25, droney = 0.25, dronez = 0.1;
-    if(count_crash >= 12)return setpoint;
+    double dronex = 0.35, droney = 0.35, dronez = 0.25;
+    if(count_crash >= 15)return setpoint;
 
     for (int i=-1;i<=1;i+=2){
         for (int j=-1;j<=1;j+=2){
@@ -70,10 +70,18 @@ pair< pair<double, double> , double> drone_crash(point3d current, pair< pair<dou
 
 /* Takes in current position(current) and next setpoint(sp) and returns a point between current and sp. */
 pair<pair<double, double> , double> step(point3d current, pair<pair<double, double> , double> sp){
+    point3d te(sp.first.first, sp.first.second, sp.second);
+    double val = l2_norm(te,current);
+    if (val<=0.8)return sp;
+    te-=current;
+    te = te.normalize();
+    te*= 0.8;
+    te+=current;
+    
     pair<pair<double, double> , double> setpoint;
-    setpoint.first.first = (2*current.x() + sp.first.first) / 3.0;
-    setpoint.first.second = (2*current.y() + sp.first.second) / 3.0;
-    setpoint.second = (2*current.z() + sp.second) / 3.0;
+    setpoint.first.first =te.x(); // (4*current.x() + sp.first.first) / 5.0;
+    setpoint.first.second =te.y(); // (4*current.y() + sp.first.second) / 5.0;
+    setpoint.second =te.z(); // (4*current.z() + sp.second) / 5.0;
     return setpoint;
 }
 
@@ -99,14 +107,17 @@ int main(int argc, char **argv){
     }
     point3d ref_current = Current;
     point3d prev = ref_current, ref_orien = Orien;
+    point3d dest;
     octomap::OcTree* ref_octree = Octree;
     ROS_INFO("started");
-    for(int check=0;ros::ok()&&(check<30);check++){
+    //loc = ref_current;
+    for(int check=0;ros::ok()&&(check>-1);check++){
     // for(int check=0;check<1;check++){
         
         ROS_INFO("IN FOR LOOP CURRENT:");
         print3d(ref_current);
-        point3d dest = decide(ref_current, prev, ref_orien, ref_octree);
+        if (check%1==0)
+            dest = decide(ref_current, prev, ref_orien, ref_octree);
         ROS_INFO("DEST : ");
         print3d(dest);
         geometry_msgs::PoseStamped dest_tmp;
@@ -140,13 +151,13 @@ int main(int argc, char **argv){
 
         vector<pair< pair<double, double> , double> > mp;
         for(auto i:m){
-            if(i.second<=2.0 && !check_occupancy(point3d(i.first.first.first, i.first.first.second, i.first.second),ref_octree, 0.3))mp.push_back(i.first);//   
+            if(i.second<=8.0 && !check_occupancy(point3d(i.first.first.first, i.first.first.second, i.first.second),ref_octree, 0.3))mp.push_back(i.first);//   
         }
 
         ROS_INFO("Size of mp : %d",(int)mp.size() );
         //return 0;
         //print3d(Current);// 
-        pair< pair<double, double> , double> x1 = Astar(ref_current, dest, mp, ref_octree);
+        pair< pair<double, double> , double> x1 = Astar(ref_current, dest, mp, ref_octree,ref_orien);
         x1 = step(ref_current, x1);
         pair< pair<double, double> , double> x = drone_crash(ref_current, x1, ref_octree, 0);
         
@@ -155,6 +166,7 @@ int main(int argc, char **argv){
         //               x.second - Current.z());
         //Orien = new_orien;
         //print3d(Current);
+        repel.push_back(x);
         point3d new_x(x.first.first, x.first.second, x.second);
         ROS_INFO("SETPOINT : ");
         print3d(new_x);
@@ -201,14 +213,7 @@ int main(int argc, char **argv){
             loop_rate.sleep();
         }
         //ros::Duration(2.0).sleep();
-        double err_value = calc_error(Orien,ref_orien);
-        qu.push(err_value);
-        total_err+=err_value;
-        qusize++;
-        if(qusize>=10){
-	        total_err-=qu.front();
-	        qu.pop();
-        }
+        loc = ref_current;
         ref_orien = Orien;
         ref_current = Current;
         ref_octree = Octree;

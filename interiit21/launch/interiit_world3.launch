@@ -6,6 +6,8 @@
 	<arg name="gui" value="$(arg gui)"/>
 	<!-- more default parameters can be changed here -->
 	</include>
+	<node pkg="tf" type="static_transform_publisher" name="optic_broadcaster" args="0 0 -0.02 -0.5 0.5 -0.5 0.5 base_link camera_link_optical 30" />
+	
 	<!-- vim: set ft=xml noet : -->
 	<!-- Experimental launch script for APM based Drone -->
 	<arg name="fcu_url" default="udp://127.0.0.1:14551@" />

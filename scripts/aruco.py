@@ -29,72 +29,57 @@ pos=None
 r=None
 p=None
 y=None
-class Controller:
+timestamp = rospy.Time()
+bridge = CvBridge()
+down_cam=np.zeros((640,400,3),np.uint8)
 
-    def __init__(self,aruco=None):
-        rospy.init_node('camera_node')
-        rospy.Subscriber("/mavros/state", State, self.state_callback)
-        rospy.Subscriber("/mavros/local_position/pose", PoseStamped, self.pos_callback)
-        # Better to comment these lines, unless you need them
-        # rospy.Subscriber("/depth_camera/rgb/image_raw", Image, self.dpcamrgb_callback)
-        # rospy.Subscriber("/depth_camera/depth/image_raw", Image, self.dpcam_callback)
-
-        rospy.Subscriber("/camera/color/image_raw", Image, self.downcam_callback)
-        self.cmd_pos_pub = rospy.Publisher("/mavros/setpoint_position/local", PoseStamped, queue_size=1)
-        self.cmd_vel_pub = rospy.Publisher("/mavros/setpoint_velocity/cmd_vel_unstamped", Twist, queue_size=1)
-
-       
-        self.aruco = aruco
-        self.pose = Pose()
-        self.state = State()
-        self.timestamp = rospy.Time()
-        self.bridge = CvBridge()
-        self.down_cam=np.zeros((640,400,3),np.uint8)
-
-    def state_callback(self, data):
-        self.state = data
-        # print(data)
-
-    def pos_callback(self, data):
-        self.timestamp = data.header.stamp
-        self.pose = data.pose
-        global pos
+def pos_callback(data):
+    timestamp = data.header.stamp
+    pose = data.pose
+    global pos
               
-        pos=[ data.pose.position.x, data.pose.position.y, data.pose.position.z]
-        global r,p,y
-        quats = [self.pose.orientation.w,
-                self.pose.orientation.x,
-                self.pose.orientation.y,
-                self.pose.orientation.z]
-        r,p,y = tf.transformations.euler_from_quaternion(quats)
-       
-    
-    def dpcamrgb_callback(self, data):
-        try:
-            bridge = CvBridge()
-            image1 = bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')[:, :, ::-1]
-            cv2.imshow("Forward_rgb", image1)
-            cv2.waitKey(1)
-        except Exception as e:
-            rospy.loginfo(e)
-    
-    def dpcam_callback(self, data):
-        try:
-            bridge = CvBridge()
-            image2 = bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')
-            cv2.imshow("Forward_depth", image2)
-            cv2.waitKey(1)
-        except Exception as e:
-            rospy.loginfo(e)
+    pos=[ data.pose.position.x, data.pose.position.y, data.pose.position.z]
+    global r,p,y
+    quats = [pose.orientation.w,
+                pose.orientation.x,
+                pose.orientation.y,
+                pose.orientation.z]
+    r,p,y = tf.transformations.euler_from_quaternion(quats)
 
-    def downcam_callback(self, data):
+def downcam_callback(data):
        
-        try:
-            bridge = CvBridge()
-            image3 = bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')[:, :, ::-1]
+    try:
+        bridge = CvBridge()
+        image3 = bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')[:, :, ::-1]
             
             
             
+<<<<<<< HEAD
+        down_cam=image3
+        global ar
+        if ar is not None:
+            global y,pos,pose_pub
+            data = ar.Main(y, pos, down_cam)
+            print(data)
+            if data != None:
+                st = Setpoints()
+                poses = Pose()
+                
+                poses.position.x, poses.position.y, poses.position.z = data
+                poses.orientation.x, poses.orientation.y, poses.orientation.z, poses.orientation.w = tf.transformations.quaternion_from_euler(0, 0, math.pi/2) 
+                st.setpoints = [poses]
+                st.header.stamp = rospy.Time.now()
+                st.header.frame_id= "map"
+                pst = PoseStamped()
+                pst.header.stamp = rospy.Time.now()
+                pst.header.frame_id="map"
+                pst.pose = poses
+                pose_pub.publish(st)
+                query_pub.publish(pst)
+
+    except Exception as e:
+        rospy.loginfo(e)
+=======
             self.down_cam=image3
             if self.aruco is not None:
                 global y,pos
@@ -103,6 +88,7 @@ class Controller:
             #cv2.waitKey(1)
         except Exception as e:
             rospy.loginfo(e)
+>>>>>>> master
 
 class Aruco_Land():
     # Constructor
@@ -201,8 +187,18 @@ class Aruco_Land():
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5,5))
         thresh = cv2.morphologyEx(thresh, cv2.MORPH_DILATE, kernel, iterations = 5)
 
+<<<<<<< HEAD
         # contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE) # For Windows
         _, contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE) # For Linux
+=======
+<<<<<<< HEAD
+        contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE) # For Windows
+        # _, contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE) # For Linux
+=======
+        # contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE) # For Windows
+        _, contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE) # For Linux
+>>>>>>> master
+>>>>>>> aman
 
         Centres = []
         for contour in contours:
@@ -370,17 +366,23 @@ class Aruco_Land():
         
         if self.Limits_Initialized:
             return self.No_Point(yaw, pos)
-       
+
 if __name__ == "__main__":
-    cont = Controller()
+    ar = Aruco_Land()
+    rospy.init_node('camera_node')
+    #rospy.Subscriber("/mavros/state", State, state_callback)
+    rospy.Subscriber("/mavros/local_position/pose", PoseStamped, pos_callback)
+        # Better to comment these lines, unless you need them
+        # rospy.Subscriber("/depth_camera/rgb/image_raw", Image, self.dpcamrgb_callback)
+        # rospy.Subscriber("/depth_camera/depth/image_raw", Image, self.dpcam_callback)
+
+    rospy.Subscriber("/camera/color/image_raw", Image, downcam_callback)
+    pose_pub = rospy.Publisher("/setpoint_array", Setpoints, queue_size=1)
+    query_pub = rospy.Publisher("/query_point", PoseStamped, queue_size=1)
     while(pos==None):
         continue
         
-    ar = Aruco_Land()
-    cont.aruco = ar
-    # Flight variables
-    takeoff_height = 3
-    velocity = 0.6
+    
 
     #cont.connect()
     #cont.takeoff(takeoff_height)

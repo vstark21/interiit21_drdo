@@ -60,10 +60,9 @@ void getBoxesBoundingBox(
   const double epsilon = 0.001;  // Small offset to not hit boundary of nodes.
   point3d epsilon_3d(epsilon, epsilon, epsilon);
 //   epsilon_3d.setConstant(epsilon);
-  point3d ext(0.0, bounding_box_size.y()-0.5,0.0);
-  point3d bbx_min = point3d(position.x()-bounding_box_size.x(),position.y()-bounding_box_size.y(),-0.5)+epsilon_3d;
+  point3d bbx_min = point3d(position.x()-bbx_size1.x(),position.y()-bbx_size1.y(),0.0)+epsilon_3d;
   //point3d bbx_min = position.x() - bounding_box_size.x() + epsilon_3d;
-  point3d bbx_max = point3d(position.x()+bounding_box_size.x(),position.y()+bounding_box_size.y(),4.5) - epsilon_3d;
+  point3d bbx_max = point3d(position.x()+bounding_box_size.x(),position.y()+bounding_box_size.y(),4.0) - epsilon_3d;
   //point3d bbx_max = position + bounding_box_size - epsilon_3d;
 
 //   octomap::point3d bbx_min = pointEigenToOctomap(bbx_min_eigen);
@@ -76,14 +75,6 @@ void getBoxesBoundingBox(
     point3d cube_center(it.getX(), it.getY(), it.getZ());
     int depth_level = it.getDepth();
     double cube_size = octree_->getNodeSize(depth_level);
-
-//     // Check if it is really inside bounding box, since leaf_bbx_iterator begins
-//     // "too early"
-//     Eigen::Vector3d cube_lower_bound =
-//         cube_center - (cube_size / 2) * Eigen::Vector3d::Ones();
-//     Eigen::Vector3d cube_upper_bound =
-//         cube_center + (cube_size / 2) * Eigen::Vector3d::Ones();
-   
     if (octree_->isNodeOccupied(*it)) {
       box_vector->emplace_back(cube_center, cube_size);
     } 
@@ -98,7 +89,7 @@ void insert(pair< pair<double, double> , double> p, map< pair< pair<double, doub
 /* Finds and inserts all the corners of a given point(p) into a map(m).*/
 void find_corners(point3d p, double d, map< pair< pair<double, double> , double>, int>& m){
     // d*=0.9;
-    double dronex = 0.6, droney = 0.6, dronez = 0.4;
+    double dronex = 0.6, droney = 0.6, dronez = 0.5;
     // for(int i=-1; i<=1; i+=2){
     //     for(int j=-1;j<=1;j+=2){
     //         for(int k=-1;k<=1;k+=2){
@@ -119,12 +110,12 @@ void find_corners(point3d p, double d, map< pair< pair<double, double> , double>
                 fy = cy / factor;
                 cz = (p.z() + k*(d+dronez)/2)*factor;
                 fz = cz / factor;
-                
-                insert({{fx, fy}, fz}, m);
+                if(fz<=5.0 && fz>=0.5){
+                    insert({{fx, fy}, fz}, m);
+                }
             }
         }
     }
-    // insert({{p.x(), p.y()}, p.z()}, m);
 }
 
 void print3d(point3d f3){
@@ -133,20 +124,30 @@ void print3d(point3d f3){
 }
 
 /* Returns euclidean distance between given points (a, b).*/
-double l2_norm(point3d a, point3d b){
+
+double l2_norm(point3d a, point3d b = point3d(0.0, 0.0, 0.0)){
     // No need of sqrt
     return sqrt(pow(a.x()- b.x(), 2) + 
                     pow(a.y() - b.y(), 2) +
                     pow(a.z() - b.z(), 2));
 }
 
+
+double calc_ang(point3d a,point3d b){
+    a=a.normalize();
+    b=b.normalize();
+    double val = a.dot(b);
+    return acos(val);
+}
+
 /** Casts a ray from a point(src) to another point(dest) in a given octree, 
  * and returns true if hit, else returns false. */
 bool raycast(point3d src, point3d dest, OcTree* octree, bool ignoreUnknownCells=true){
-    if(src.z() < 0.3)return true;
-    if(dest.z() < 0.3)return true;
-    if(src.z() > 4.7)return true;
-    if(dest.z() > 4.7)return true;
+    // Returns true if hit, else false
+    if(src.z() <= 0.3)return true;
+    if(dest.z() <= 0.3)return true;
+    if(src.z() >= 4.7)return true;
+    if(dest.z() >= 4.7)return true;
 
     if(src == dest)return false;
 
@@ -231,31 +232,29 @@ bool check_occupancy(point3d g, OcTree* octree, double s){
 
 /* Decides next setpoint based on current position, previous setpoint and current orientation with respect to given octree. */
 point3d decide(point3d current, point3d prev, point3d orien, OcTree* octree){
-    accum*=2.0;
-    accum = accum+ orien;
     
     double length = 5.0;
     point3d pull;
-    if(current.z() <= 3.0){
-        point3d pull_(0.0, 0.0, 0.5*pow(3.0 - current.z(), 2));
+    if(current.z() <= 2.5){
+        point3d pull_(0.0, 0.0, 1.5*pow(2.5 - current.z(), 2));
         pull = pull_;
     }
     else{
-        point3d pull_(0.0, 0.0, -0.5*pow(3.0 - current.z(), 2));
+        point3d pull_(0.0, 0.0, -1.5*pow(2.5 - current.z(), 2));
         pull = pull_;
     }
     // prev = current;
     point3d f1(orien.x(), orien.y(), 0.0);
     point3d f2(prev.x() - current.x(), prev.y() - current.y(), 0.0);
-
+    point3d f3(loc.x()-current.x(), loc.y() - current.y(), 0.0);
     
     point3d orien_norm = f1.normalize();
-
-    point3d prev_norm = f2.normalize();
-    prev_norm *= 5.0; //point3d(1.1*prev_norm.x(),
-    
+    if(l2_norm(f3)>0.7){
+        prev_norm = f2; //.normalize();
+        prev_norm *= 3.0; //point3d(1.1*prev_norm.x(),
+    }
     // if(prev_norm.y() + orien_norm.y() )
-    point3d new_dir =  prev_norm + orien_norm + pull; // + accum.normalize();
+    point3d new_dir =  prev_norm + orien_norm; //  + point3d(-1,0,0); // + accum.normalize();
     //point3d new_dir = orien_norm + pull - vec(total_err,0.8); 
     point3d new_dir_norm = new_dir.normalize();
 
@@ -267,24 +266,26 @@ point3d decide(point3d current, point3d prev, point3d orien, OcTree* octree){
     }
     // point3d new_bbx(length, bbx_size.y(), length);
     // bbx_size = new_bbx;
+
     cout << length << endl;
-    if(new_dir.z() + current.z() >= 0.5 && new_dir.z() + current.z() <= 4.5){
-        point3d ans(new_dir.x() + current.x(), new_dir.y() + current.y(), 3.0);
-        return ans;
+    if(new_dir.z() + current.z() >= 1.5 && new_dir.z() + current.z() <= 3.5){
+        return new_dir + current;
+    //    point3d ans(new_dir.x() + current.x(), new_dir.y() + current.y(), 3.0);
+    //    return ans;
 
     }
-    if(new_dir.z() + current.z() < 0.5){
-        point3d ans(new_dir.x() + current.x(), new_dir.y() + current.y(), 3.0);
+    if(new_dir.z() + current.z() < 2.5){
+        point3d ans(new_dir.x() + current.x(), new_dir.y() + current.y(), 2.0);
         return ans;
     }
     point3d ans(new_dir.x() + current.x(), new_dir.y() + current.y(), 3.0);
-
+    
     return ans;
 }
 
 /** Creates adjacency matrix with the help of raycast function and performs path planning from 
  * current position to destination using A* algorithm. */
-pair< pair<double, double> , double> Astar(point3d current, point3d dest, vector<pair< pair<double, double> , double> >& mp, OcTree* octree){
+pair< pair<double, double> , double> Astar(point3d current, point3d dest, vector<pair< pair<double, double> , double> >& mp, OcTree* octree,point3d orien){
 
     // OccupancyOcTreeBase<OcTreeNode>* octree_ = (OccupancyOcTreeBase<OcTreeNode>*) octree;
 
@@ -418,8 +419,21 @@ pair< pair<double, double> , double> Astar(point3d current, point3d dest, vector
             if(g[q.second] + norm_elqs < g[el]){
                 parent[el] = q.second;
                 g[el] = g[q.second] + norm_elqs;
-                h[el] = l2_norm(target, mp[el]) + 5.0*pow(mp[el].second - 3.0, 2);
+                point3d var(mp[start_idx].first.first-mp[el].first.first,mp[start_idx].first.second-mp[el].first.second,mp[start_idx].second-mp[el].second);
+                double hit = 15.0*pow(mp[el].second - 2.5, 2);
+                if (mp[el].second>=1.5 || mp[el].second<=3.5) hit = hit/3.0; 
+                long long int r=0;
+                for(int it=0;it<(repel.size()-5);it++)
+                {
+                    int k=5;
+                    int d= l2_norm(repel.at(it),mp[el]);
+                    if(d==0) r+=1000000;
+                    else r+= k/(d*d);
+                }
+                h[el] = 2.0*l2_norm(target, mp[el]) + hit + r + (mp[start_idx].first.second-mp[el].first.second)*0.5; // + (mp[el].first.first-mp[start_idx].first.first)*2.0;
+                /*note change y back to 1.0*/
                 f[el] = g[el] + h[el];
+                //-20.0*calc_ang(var,orien)
                 openpq.push({f[el], el});
             }
                        
